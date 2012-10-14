@@ -574,34 +574,55 @@ listenerRun(void *data)
     socklen_t len;
     fd_set listen_fds;  /* temp file descriptor list for select() */
 
+    struct timeval TimeOut ; //============> GIAN
+    int ret ;
+
     /* TODO: this thread wont die by restarting the server */
     /* TODO: HTTP is not handled */
-    while (1) {
+    while (!screen->AbortTh)     // thread still alive =====> GIAN
+//    while (1)
+    {
         client_fd = -1;
         FD_ZERO(&listen_fds);
-	if(screen->listenSock >= 0) 
-	  FD_SET(screen->listenSock, &listen_fds);
-	if(screen->listen6Sock >= 0) 
-	  FD_SET(screen->listen6Sock, &listen_fds);
 
-        if (select(screen->maxFd+1, &listen_fds, NULL, NULL, NULL) == -1) {
+	     if (screen->listenSock >= 0)
+	        FD_SET(screen->listenSock, &listen_fds);
+	     if (screen->listen6Sock >= 0)
+	        FD_SET(screen->listen6Sock, &listen_fds);
+
+	     TimeOut.tv_sec  = 1 ;       // seconds      =====> GIAN
+	     TimeOut.tv_usec = 0 ;       // nanoseconds  =====> GIAN
+
+        if ((ret = select(screen->maxFd+1, &listen_fds, NULL, NULL, &TimeOut)) == -1) // =====> GIAN
+        {
             rfbLogPerror("listenerRun: error in select");
             return NULL;
         }
-	
-	/* there is something on the listening sockets, handle new connections */
-	len = sizeof (peer);
-	if (FD_ISSET(screen->listenSock, &listen_fds)) 
-	    client_fd = accept(screen->listenSock, (struct sockaddr*)&peer, &len);
-	else if (FD_ISSET(screen->listen6Sock, &listen_fds))
-	    client_fd = accept(screen->listen6Sock, (struct sockaddr*)&peer, &len);
+        if (!ret)       // timeout =====> GIAN
+      	  continue ;
 
-	if(client_fd >= 0)
-	  cl = rfbNewClient(screen,client_fd);
-	if (cl && !cl->onHold )
-	  rfbStartOnHoldClient(cl);
+        /*
+        if (select(screen->maxFd+1, &listen_fds, NULL, NULL, NULL) == -1)
+        {
+            rfbLogPerror("listenerRun: error in select");
+            return NULL;
+        } */
+	
+	     /* there is something on the listening sockets, handle new connections */
+	     len = sizeof (peer);
+	     if (FD_ISSET(screen->listenSock, &listen_fds))
+	        client_fd = accept(screen->listenSock, (struct sockaddr*)&peer, &len) ;
+	     else
+	     if (FD_ISSET(screen->listen6Sock, &listen_fds))
+	        client_fd = accept(screen->listen6Sock, (struct sockaddr*)&peer, &len);
+
+	     if (client_fd >= 0)
+	        cl = rfbNewClient(screen,client_fd);
+	     if (cl && !cl->onHold )
+	        rfbStartOnHoldClient(cl);
     }
-    return(NULL);
+ 	 screen->AbortTh = 2 ; // Thread closed ========> GIAN
+    return(NULL) ;
 }
 
 void 
@@ -1181,6 +1202,7 @@ void rfbRunEventLoop(rfbScreenInfoPtr screen, long usec, rfbBool runInBackground
 
        screen->backgroundLoop = TRUE;
 
+       screen->AbortTh = 0 ; // allow thread termination ===========> GIAN
        pthread_create(&listener_thread, NULL, listenerRun, screen);
     return;
 #else
@@ -1194,4 +1216,27 @@ void rfbRunEventLoop(rfbScreenInfoPtr screen, long usec, rfbBool runInBackground
 
   while(rfbIsActive(screen))
     rfbProcessEvents(screen,usec);
+}
+
+//==============> GIAN
+rfbBool rfbRunEventLoopClose(rfbScreenInfoPtr screen)
+{
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+   int loop ;
+
+	screen->AbortTh = 1 ;   // force thread closing
+
+	for (loop=0 ; loop<3 ; loop++)
+	{
+	    if (screen->AbortTh == 2)
+	 	   return true ;     // Ok
+	    }
+	    sleep(1) ;
+	}
+   return false ; // ko
+
+#else
+    rfbErr("Can't run in background, because I don't have PThreads!\n");
+    return;
+#endif
 }

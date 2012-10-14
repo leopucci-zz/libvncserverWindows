@@ -389,6 +389,8 @@ typedef struct _rfbScreenInfo
     SOCKET listen6Sock;
     int http6Port;
     SOCKET httpListen6Sock;
+
+    char AbortTh ;	// allow thread termination ===========> GIAN
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 
@@ -686,7 +688,7 @@ typedef struct _rfbClientRec {
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
     /* TurboVNC Encoding support (extends TightVNC) */
     int turboSubsampLevel;
-    int turboQualityLevel;  /* 1-100 scale */
+    int turboQualityLevel;  // 1-100 scale
 #endif
 #endif
 
@@ -1051,6 +1053,7 @@ extern void rfbRefuseOnHoldClient(rfbClientPtr cl);
  rfbProcessEvents() returns TRUE if an update was pending. */
 
 extern void rfbRunEventLoop(rfbScreenInfoPtr screenInfo, long usec, rfbBool runInBackground);
+extern rfbBool rfbRunEventLoopClose(rfbScreenInfoPtr screen) ; //============> GIAN
 extern rfbBool rfbProcessEvents(rfbScreenInfoPtr screenInfo,long usec);
 extern rfbBool rfbIsActive(rfbScreenInfoPtr screenInfo);
 
