@@ -31,7 +31,9 @@
 #endif
 #include <stdio.h>
 #include <stdlib.h>
+#ifdef LIBVNCSERVER_HAVE_UNISTD_H
 #include <unistd.h>
+#endif
 #include <rfb/rfbproto.h>
 #include "d3des.h"
 
@@ -51,6 +53,7 @@
 #include <sys/time.h>
 #endif
 
+#include <rfb/rfb.h>
 
 /* libvncclient does not need this */
 #ifndef rfbEncryptBytes

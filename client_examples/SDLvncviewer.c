@@ -6,6 +6,7 @@
 #include <signal.h>
 #include <rfb/rfbclient.h>
 #include "scrap.h"
+#include <rfb/rfb.h>
 
 struct { int sdl; int rfb; } buttonMapping[]={
 	{1, rfbButton1Mask},
@@ -28,6 +29,7 @@ static char *sdlPixels;
 static int rightAltKeyDown, leftAltKeyDown;
 
 static rfbBool resize(rfbClient* client) {
+	rfbBool okay;
 	int width=client->width,height=client->height,
 		depth=client->format.bitsPerPixel;
 
@@ -36,7 +38,7 @@ static rfbBool resize(rfbClient* client) {
 
 	client->updateRect.x = client->updateRect.y = 0;
 	client->updateRect.w = width; client->updateRect.h = height;
-	rfbBool okay=SDL_VideoModeOK(width,height,depth,sdlFlags);
+	okay=SDL_VideoModeOK(width,height,depth,sdlFlags);
 	if(!okay)
 		for(depth=24;!okay && depth>4;depth/=2)
 			okay=SDL_VideoModeOK(width,height,depth,sdlFlags);

@@ -17,6 +17,7 @@
  *  USA.
  */
 
+#include "private.h"
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 
 /*
@@ -83,12 +84,14 @@ static int HandleZRLETile(rfbClient* client,
 static rfbBool
 HandleZRLE (rfbClient* client, int rx, int ry, int rw, int rh)
 {
+	struct rfbClientPrivate *priv;
 	rfbZRLEHeader header;
 	int remaining;
 	int inflateResult;
 	int toRead;
 	int min_buffer_size = rw * rh * (REALBPP / 8) * 2;
 
+	priv = RFB_CLIENT_PRIV(client);
 	/* First make sure we have a large enough raw buffer to hold the
 	 * decompressed data.  In practice, with a fixed REALBPP, fixed frame
 	 * buffer size and the first update containing the entire frame
@@ -114,26 +117,26 @@ HandleZRLE (rfbClient* client, int rx, int ry, int rw, int rh)
 	remaining = rfbClientSwap32IfLE(header.length);
 
 	/* Need to initialize the decompressor state. */
-	client->decompStream.next_in   = ( Bytef * )client->buffer;
-	client->decompStream.avail_in  = 0;
-	client->decompStream.next_out  = ( Bytef * )client->raw_buffer;
-	client->decompStream.avail_out = client->raw_buffer_size;
-	client->decompStream.data_type = Z_BINARY;
+	priv->decompStream.next_in   = ( Bytef * )client->buffer;
+	priv->decompStream.avail_in  = 0;
+	priv->decompStream.next_out  = ( Bytef * )client->raw_buffer;
+	priv->decompStream.avail_out = client->raw_buffer_size;
+	priv->decompStream.data_type = Z_BINARY;
 
 	/* Initialize the decompression stream structures on the first invocation. */
-	if ( client->decompStreamInited == FALSE ) {
+	if ( priv->decompStreamInited == FALSE ) {
 
-		inflateResult = inflateInit( &client->decompStream );
+		inflateResult = inflateInit( &priv->decompStream );
 
 		if ( inflateResult != Z_OK ) {
 			rfbClientLog(
 					"inflateInit returned error: %d, msg: %s\n",
 					inflateResult,
-					client->decompStream.msg);
+					priv->decompStream.msg);
 			return FALSE;
 		}
 
-		client->decompStreamInited = TRUE;
+		priv->decompStreamInited = TRUE;
 
 	}
 
@@ -156,11 +159,11 @@ HandleZRLE (rfbClient* client, int rx, int ry, int rw, int rh)
 		if (!ReadFromRFBServer(client, client->buffer,toRead))
 			return FALSE;
 
-		client->decompStream.next_in  = ( Bytef * )client->buffer;
-		client->decompStream.avail_in = toRead;
+		priv->decompStream.next_in  = ( Bytef * )client->buffer;
+		priv->decompStream.avail_in = toRead;
 
 		/* Need to uncompress buffer full. */
-		inflateResult = inflate( &client->decompStream, Z_SYNC_FLUSH );
+		inflateResult = inflate( &priv->decompStream, Z_SYNC_FLUSH );
 
 		/* We never supply a dictionary for compression. */
 		if ( inflateResult == Z_NEED_DICT ) {
@@ -171,15 +174,15 @@ HandleZRLE (rfbClient* client, int rx, int ry, int rw, int rh)
 			rfbClientLog(
 					"zlib inflate returned error: %d, msg: %s\n",
 					inflateResult,
-					client->decompStream.msg);
+					priv->decompStream.msg);
 			return FALSE;
 		}
 
 		/* Result buffer allocated to be at least large enough.  We should
 		 * never run out of space!
 		 */
-		if (( client->decompStream.avail_in > 0 ) &&
-				( client->decompStream.avail_out <= 0 )) {
+		if (( priv->decompStream.avail_in > 0 ) &&
+				( priv->decompStream.avail_out <= 0 )) {
 			rfbClientLog("zlib inflate ran out of space!\n");
 			return FALSE;
 		}
@@ -189,10 +192,10 @@ HandleZRLE (rfbClient* client, int rx, int ry, int rw, int rh)
 	} /* while ( remaining > 0 ) */
 
 	if ( inflateResult == Z_OK ) {
-		void* buf=client->raw_buffer;
+		char* buf=client->raw_buffer;
 		int i,j;
 
-		remaining = client->raw_buffer_size-client->decompStream.avail_out;
+		remaining = client->raw_buffer_size-priv->decompStream.avail_out;
 
 		for(j=0; j<rh; j+=rfbZRLETileHeight)
 			for(i=0; i<rw; i+=rfbZRLETileWidth) {
@@ -215,7 +218,7 @@ return TRUE;
 		rfbClientLog(
 				"zlib inflate returned error: %d, msg: %s\n",
 				inflateResult,
-				client->decompStream.msg);
+				priv->decompStream.msg);
 		return FALSE;
 
 	}
@@ -238,6 +241,7 @@ static int HandleZRLETile(rfbClient* client,
 		int x,int y,int w,int h) {
 	uint8_t* buffer_copy = buffer;
 	uint8_t* buffer_end = buffer+buffer_length;
+	struct rfbClientPrivate *priv;
 	uint8_t type;
 #if BPP!=8
 	uint8_t zywrle_level = (client->appData.qualityLevel & 0x80) ?
@@ -247,6 +251,7 @@ static int HandleZRLETile(rfbClient* client,
 	if(buffer_length<1)
 		return -2;
 
+	priv = RFB_CLIENT_PRIV(client);
 	type = *buffer;
 	buffer++;
 	{
@@ -261,7 +266,7 @@ static int HandleZRLETile(rfbClient* client,
 			if( ret < 0 ){
 				return ret;
 			}
-			ZYWRLE_SYNTHESIZE( pFrame, pFrame, w, h, client->width, zywrle_level, (int*)client->zlib_buffer );
+			ZYWRLE_SYNTHESIZE( pFrame, pFrame, w, h, client->width, zywrle_level, (int*)priv->zlib_buffer );
 			buffer += ret;
 		  }else
 #endif

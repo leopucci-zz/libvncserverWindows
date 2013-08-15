@@ -31,6 +31,7 @@
  */
 
 #include <rfb/rfb.h>
+#include "private.h"
 
 /*
  * zlibBeforeBuf contains pixel data in the client's format.
@@ -84,6 +85,7 @@ rfbSendOneRectEncodingZlib(rfbClientPtr cl,
                            int w,
                            int h)
 {
+	struct rfbClientRecPrivate *priv;
     rfbFramebufferUpdateRectHeader rect;
     rfbZlibHeader hdr;
     int deflateResult;
@@ -95,6 +97,7 @@ rfbSendOneRectEncodingZlib(rfbClientPtr cl,
     int maxRawSize;
     int maxCompSize;
 
+	priv = RFB_CLIENT_REC_PRIV(cl);
     maxRawSize = (cl->scaledScreen->width * cl->scaledScreen->height
                   * (cl->format.bitsPerPixel / 8));
 
@@ -154,43 +157,43 @@ rfbSendOneRectEncodingZlib(rfbClientPtr cl,
 		       &cl->format, fbptr, zlibBeforeBuf,
 		       cl->scaledScreen->paddedWidthInBytes, w, h);
 
-    cl->compStream.next_in = ( Bytef * )zlibBeforeBuf;
-    cl->compStream.avail_in = w * h * (cl->format.bitsPerPixel / 8);
-    cl->compStream.next_out = ( Bytef * )zlibAfterBuf;
-    cl->compStream.avail_out = maxCompSize;
-    cl->compStream.data_type = Z_BINARY;
+    priv->compStream.next_in = ( Bytef * )zlibBeforeBuf;
+    priv->compStream.avail_in = w * h * (cl->format.bitsPerPixel / 8);
+    priv->compStream.next_out = ( Bytef * )zlibAfterBuf;
+    priv->compStream.avail_out = maxCompSize;
+    priv->compStream.data_type = Z_BINARY;
 
     /* Initialize the deflation state. */
-    if ( cl->compStreamInited == FALSE ) {
+    if ( priv->compStreamInited == FALSE ) {
 
-        cl->compStream.total_in = 0;
-        cl->compStream.total_out = 0;
-        cl->compStream.zalloc = Z_NULL;
-        cl->compStream.zfree = Z_NULL;
-        cl->compStream.opaque = Z_NULL;
+        priv->compStream.total_in = 0;
+        priv->compStream.total_out = 0;
+        priv->compStream.zalloc = Z_NULL;
+        priv->compStream.zfree = Z_NULL;
+        priv->compStream.opaque = Z_NULL;
 
-        deflateInit2( &(cl->compStream),
-                        cl->zlibCompressLevel,
+        deflateInit2( &(priv->compStream),
+                        priv->zlibCompressLevel,
                         Z_DEFLATED,
                         MAX_WBITS,
                         MAX_MEM_LEVEL,
                         Z_DEFAULT_STRATEGY );
-        /* deflateInit( &(cl->compStream), Z_BEST_COMPRESSION ); */
-        /* deflateInit( &(cl->compStream), Z_BEST_SPEED ); */
-        cl->compStreamInited = TRUE;
+        /* deflateInit( &(priv->compStream), Z_BEST_COMPRESSION ); */
+        /* deflateInit( &(priv->compStream), Z_BEST_SPEED ); */
+        priv->compStreamInited = TRUE;
 
     }
 
-    previousOut = cl->compStream.total_out;
+    previousOut = priv->compStream.total_out;
 
     /* Perform the compression here. */
-    deflateResult = deflate( &(cl->compStream), Z_SYNC_FLUSH );
+    deflateResult = deflate( &(priv->compStream), Z_SYNC_FLUSH );
 
     /* Find the total size of the resulting compressed data. */
-    zlibAfterBufLen = cl->compStream.total_out - previousOut;
+    zlibAfterBufLen = priv->compStream.total_out - previousOut;
 
     if ( deflateResult != Z_OK ) {
-        rfbErr("zlib deflation error: %s\n", cl->compStream.msg);
+        rfbErr("zlib deflation error: %s\n", priv->compStream.msg);
         return FALSE;
     }
 

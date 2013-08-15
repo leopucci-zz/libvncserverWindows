@@ -48,9 +48,15 @@ static MUTEX(extMutex);
 static int rfbEnableLogging=1;
 
 #ifdef LIBVNCSERVER_WORDS_BIGENDIAN
-char rfbEndianTest = (1==0);
+char rfbEndianTest() 
+{
+	return (1==0);
+}
 #else
-char rfbEndianTest = (1==1);
+char rfbEndianTest()
+{
+	return (1==1);
+}
 #endif
 
 /*
@@ -227,7 +233,7 @@ void rfbLogEnable(int enabled) {
  * rfbLog prints a time-stamped message to the log file (stderr).
  */
 
-static void
+void
 rfbDefaultLog(const char *format, ...)
 {
     va_list args;
@@ -255,9 +261,6 @@ rfbDefaultLog(const char *format, ...)
     va_end(args);
     UNLOCK(logMutex);
 }
-
-rfbLogProc rfbLog=rfbDefaultLog;
-rfbLogProc rfbErr=rfbDefaultLog;
 
 void rfbLogPerror(const char *str)
 {
@@ -1052,8 +1055,10 @@ void rfbInitServer(rfbScreenInfoPtr screen)
   rfbInitSockets(screen);
   rfbHttpInitSockets(screen);
 #ifndef __MINGW32__
+#ifndef _MSC_VER
   if(screen->ignoreSIGPIPE)
     signal(SIGPIPE,SIG_IGN);
+#endif
 #endif
 }
 

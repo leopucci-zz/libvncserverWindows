@@ -53,6 +53,9 @@
  #define max(a,b) ((a)>(b)?(a):(b))
 #endif
 
+#ifdef _MSC_VER
+#define snprintf _snprintf
+#endif
 
 /* Error handling (based on example in example.c) */
 

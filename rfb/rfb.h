@@ -127,6 +127,16 @@ extern "C"
 struct _rfbClientRec;
 struct _rfbScreenInfo;
 struct rfbCursor;
+#ifndef _IN_ADDR_T
+#define _IN_ADDR_T
+typedef uint32_t in_addr_t;
+#endif
+
+#if defined(_MSC_VER) && defined(DLLDEFINE)
+#define DLLEXPORT __declspec(dllexport)
+#else
+#define DLLEXPORT
+#endif
 
 enum rfbNewClientAction {
 	RFB_CLIENT_ACCEPT,
@@ -591,26 +601,6 @@ typedef struct _rfbClientRec {
     int rawBytesEquivalent;
     int bytesSent;
 
-#ifdef LIBVNCSERVER_HAVE_LIBZ
-    /* zlib encoding -- necessary compression state info per client */
-
-    struct z_stream_s compStream;
-    rfbBool compStreamInited;
-    uint32_t zlibCompressLevel;
-#endif
-#if defined(LIBVNCSERVER_HAVE_LIBZ) || defined(LIBVNCSERVER_HAVE_LIBPNG)
-    /** the quality level is also used by ZYWRLE and TightPng */
-    int tightQualityLevel;
-
-#ifdef LIBVNCSERVER_HAVE_LIBJPEG
-    /* tight encoding -- preserve zlib streams' state for each client */
-    z_stream zsStruct[4];
-    rfbBool zsActive[4];
-    int zsLevel[4];
-    int tightCompressLevel;
-#endif
-#endif
-
     /* Ultra Encoding support */
     rfbBool compStreamInitedLZO;
     char *lzoWrkMem;
@@ -652,13 +642,7 @@ typedef struct _rfbClientRec {
     COND(updateCond);
 #endif
 
-#ifdef LIBVNCSERVER_HAVE_LIBZ
-    void* zrleData;
-    int zywrleLevel;
-    int zywrleBuf[rfbZRLETileWidth * rfbZRLETileHeight];
-#endif
-
-    /** if progressive updating is on, this variable holds the current
+   /** if progressive updating is on, this variable holds the current
      * y coordinate of the progressive slice. */
     int progressiveSliceY;
 
@@ -681,15 +665,6 @@ typedef struct _rfbClientRec {
   char *afterEncBuf;
   int afterEncBufSize;
   int afterEncBufLen;
-#if defined(LIBVNCSERVER_HAVE_LIBZ) || defined(LIBVNCSERVER_HAVE_LIBPNG)
-    uint32_t tightEncoding;  /* rfbEncodingTight or rfbEncodingTightPng */
-#ifdef LIBVNCSERVER_HAVE_LIBJPEG
-    /* TurboVNC Encoding support (extends TightVNC) */
-    int turboSubsampLevel;
-    int turboQualityLevel;  /* 1-100 scale */
-#endif
-#endif
-
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
     rfbSslCtx *sslctx;
     wsCtx     *wsctx;
@@ -726,7 +701,7 @@ typedef struct _rfbClientRec {
                    ((l) << 24))
 
 
-extern char rfbEndianTest;
+DLLEXPORT extern char rfbEndianTest();
 
 #define Swap16IfLE(s) (rfbEndianTest ? Swap16(s) : (s))
 #define Swap24IfLE(l) (rfbEndianTest ? Swap24(l) : (l))
@@ -741,30 +716,34 @@ extern char rfbEndianTest;
 
 extern int rfbMaxClientWait;
 
-extern void rfbInitSockets(rfbScreenInfoPtr rfbScreen);
-extern void rfbShutdownSockets(rfbScreenInfoPtr rfbScreen);
-extern void rfbDisconnectUDPSock(rfbScreenInfoPtr rfbScreen);
-extern void rfbCloseClient(rfbClientPtr cl);
-extern int rfbReadExact(rfbClientPtr cl, char *buf, int len);
-extern int rfbReadExactTimeout(rfbClientPtr cl, char *buf, int len,int timeout);
-extern int rfbPeekExactTimeout(rfbClientPtr cl, char *buf, int len,int timeout);
-extern int rfbWriteExact(rfbClientPtr cl, const char *buf, int len);
-extern int rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec);
-extern int rfbConnect(rfbScreenInfoPtr rfbScreen, char* host, int port);
-extern int rfbConnectToTcpAddr(char* host, int port);
-extern int rfbListenOnTCPPort(int port, in_addr_t iface);
-extern int rfbListenOnTCP6Port(int port, const char* iface);
-extern int rfbListenOnUDPPort(int port, in_addr_t iface);
-extern int rfbStringToAddr(char* string,in_addr_t* addr);
-extern rfbBool rfbSetNonBlocking(int sock);
+#ifndef LIBVNCSERVER_HAVE_GETTIMEOFDAY
+DLLEXPORT void gettimeofday(struct timeval* tv,char* dummy);
+#endif
+DLLEXPORT int rfbEncryptAndStorePasswd(char *passwd, char *fname);
+DLLEXPORT extern void rfbInitSockets(rfbScreenInfoPtr rfbScreen);
+DLLEXPORT extern void rfbShutdownSockets(rfbScreenInfoPtr rfbScreen);
+DLLEXPORT extern void rfbDisconnectUDPSock(rfbScreenInfoPtr rfbScreen);
+DLLEXPORT extern void rfbCloseClient(rfbClientPtr cl);
+DLLEXPORT extern int rfbReadExact(rfbClientPtr cl, char *buf, int len);
+DLLEXPORT extern int rfbReadExactTimeout(rfbClientPtr cl, char *buf, int len,int timeout);
+DLLEXPORT extern int rfbPeekExactTimeout(rfbClientPtr cl, char *buf, int len,int timeout);
+DLLEXPORT extern int rfbWriteExact(rfbClientPtr cl, const char *buf, int len);
+DLLEXPORT extern int rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec);
+DLLEXPORT extern int rfbConnect(rfbScreenInfoPtr rfbScreen, char* host, int port);
+DLLEXPORT extern int rfbConnectToTcpAddr(char* host, int port);
+DLLEXPORT extern int rfbListenOnTCPPort(int port, in_addr_t iface);
+DLLEXPORT extern int rfbListenOnTCP6Port(int port, const char* iface);
+DLLEXPORT extern int rfbListenOnUDPPort(int port, in_addr_t iface);
+DLLEXPORT extern int rfbStringToAddr(char* string,in_addr_t* addr);
+DLLEXPORT extern rfbBool rfbSetNonBlocking(int sock);
 
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
 /* websockets.c */
 
-extern rfbBool webSocketsCheck(rfbClientPtr cl);
-extern rfbBool webSocketCheckDisconnect(rfbClientPtr cl);
-extern int webSocketsEncode(rfbClientPtr cl, const char *src, int len, char **dst);
-extern int webSocketsDecode(rfbClientPtr cl, char *dst, int len);
+DLLEXPORT extern rfbBool webSocketsCheck(rfbClientPtr cl);
+DLLEXPORT extern rfbBool webSocketCheckDisconnect(rfbClientPtr cl);
+DLLEXPORT extern int webSocketsEncode(rfbClientPtr cl, const char *src, int len, char **dst);
+DLLEXPORT extern int webSocketsDecode(rfbClientPtr cl, char *dst, int len);
 #endif
 
 /* rfbserver.c */
@@ -773,83 +752,83 @@ extern int webSocketsDecode(rfbClientPtr cl, char *dst, int len);
    Only a single iterator can be in use at a time process-wide. */
 typedef struct rfbClientIterator *rfbClientIteratorPtr;
 
-extern void rfbClientListInit(rfbScreenInfoPtr rfbScreen);
-extern rfbClientIteratorPtr rfbGetClientIterator(rfbScreenInfoPtr rfbScreen);
-extern rfbClientPtr rfbClientIteratorNext(rfbClientIteratorPtr iterator);
-extern void rfbReleaseClientIterator(rfbClientIteratorPtr iterator);
-extern void rfbIncrClientRef(rfbClientPtr cl);
-extern void rfbDecrClientRef(rfbClientPtr cl);
+DLLEXPORT extern void rfbClientListInit(rfbScreenInfoPtr rfbScreen);
+DLLEXPORT extern rfbClientIteratorPtr rfbGetClientIterator(rfbScreenInfoPtr rfbScreen);
+DLLEXPORT extern rfbClientPtr rfbClientIteratorNext(rfbClientIteratorPtr iterator);
+DLLEXPORT extern void rfbReleaseClientIterator(rfbClientIteratorPtr iterator);
+DLLEXPORT extern void rfbIncrClientRef(rfbClientPtr cl);
+DLLEXPORT extern void rfbDecrClientRef(rfbClientPtr cl);
 
-extern void rfbNewClientConnection(rfbScreenInfoPtr rfbScreen,int sock);
-extern rfbClientPtr rfbNewClient(rfbScreenInfoPtr rfbScreen,int sock);
-extern rfbClientPtr rfbNewUDPClient(rfbScreenInfoPtr rfbScreen);
-extern rfbClientPtr rfbReverseConnection(rfbScreenInfoPtr rfbScreen,char *host, int port);
-extern void rfbClientConnectionGone(rfbClientPtr cl);
-extern void rfbProcessClientMessage(rfbClientPtr cl);
-extern void rfbClientConnFailed(rfbClientPtr cl, const char *reason);
-extern void rfbNewUDPConnection(rfbScreenInfoPtr rfbScreen,int sock);
-extern void rfbProcessUDPInput(rfbScreenInfoPtr rfbScreen);
-extern rfbBool rfbSendFramebufferUpdate(rfbClientPtr cl, sraRegionPtr updateRegion);
-extern rfbBool rfbSendRectEncodingRaw(rfbClientPtr cl, int x,int y,int w,int h);
-extern rfbBool rfbSendUpdateBuf(rfbClientPtr cl);
-extern void rfbSendServerCutText(rfbScreenInfoPtr rfbScreen,char *str, int len);
-extern rfbBool rfbSendCopyRegion(rfbClientPtr cl,sraRegionPtr reg,int dx,int dy);
-extern rfbBool rfbSendLastRectMarker(rfbClientPtr cl);
-extern rfbBool rfbSendNewFBSize(rfbClientPtr cl, int w, int h);
-extern rfbBool rfbSendSetColourMapEntries(rfbClientPtr cl, int firstColour, int nColours);
-extern void rfbSendBell(rfbScreenInfoPtr rfbScreen);
+DLLEXPORT extern void rfbNewClientConnection(rfbScreenInfoPtr rfbScreen,int sock);
+DLLEXPORT extern rfbClientPtr rfbNewClient(rfbScreenInfoPtr rfbScreen,int sock);
+DLLEXPORT extern rfbClientPtr rfbNewUDPClient(rfbScreenInfoPtr rfbScreen);
+DLLEXPORT extern rfbClientPtr rfbReverseConnection(rfbScreenInfoPtr rfbScreen,char *host, int port);
+DLLEXPORT extern void rfbClientConnectionGone(rfbClientPtr cl);
+DLLEXPORT extern void rfbProcessClientMessage(rfbClientPtr cl);
+DLLEXPORT extern void rfbClientConnFailed(rfbClientPtr cl, const char *reason);
+DLLEXPORT extern void rfbNewUDPConnection(rfbScreenInfoPtr rfbScreen,int sock);
+DLLEXPORT extern void rfbProcessUDPInput(rfbScreenInfoPtr rfbScreen);
+DLLEXPORT extern rfbBool rfbSendFramebufferUpdate(rfbClientPtr cl, sraRegionPtr updateRegion);
+DLLEXPORT extern rfbBool rfbSendRectEncodingRaw(rfbClientPtr cl, int x,int y,int w,int h);
+DLLEXPORT extern rfbBool rfbSendUpdateBuf(rfbClientPtr cl);
+DLLEXPORT extern void rfbSendServerCutText(rfbScreenInfoPtr rfbScreen,char *str, int len);
+DLLEXPORT extern rfbBool rfbSendCopyRegion(rfbClientPtr cl,sraRegionPtr reg,int dx,int dy);
+DLLEXPORT extern rfbBool rfbSendLastRectMarker(rfbClientPtr cl);
+DLLEXPORT extern rfbBool rfbSendNewFBSize(rfbClientPtr cl, int w, int h);
+DLLEXPORT extern rfbBool rfbSendSetColourMapEntries(rfbClientPtr cl, int firstColour, int nColours);
+DLLEXPORT extern void rfbSendBell(rfbScreenInfoPtr rfbScreen);
 
-extern char *rfbProcessFileTransferReadBuffer(rfbClientPtr cl, uint32_t length);
-extern rfbBool rfbSendFileTransferChunk(rfbClientPtr cl);
-extern rfbBool rfbSendDirContent(rfbClientPtr cl, int length, char *buffer);
-extern rfbBool rfbSendFileTransferMessage(rfbClientPtr cl, uint8_t contentType, uint8_t contentParam, uint32_t size, uint32_t length, const char *buffer);
-extern char *rfbProcessFileTransferReadBuffer(rfbClientPtr cl, uint32_t length);
-extern rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t contentParam, uint32_t size, uint32_t length);
+DLLEXPORT extern char *rfbProcessFileTransferReadBuffer(rfbClientPtr cl, uint32_t length);
+DLLEXPORT extern rfbBool rfbSendFileTransferChunk(rfbClientPtr cl);
+DLLEXPORT extern rfbBool rfbSendDirContent(rfbClientPtr cl, int length, char *buffer);
+DLLEXPORT extern rfbBool rfbSendFileTransferMessage(rfbClientPtr cl, uint8_t contentType, uint8_t contentParam, uint32_t size, uint32_t length, const char *buffer);
+DLLEXPORT extern char *rfbProcessFileTransferReadBuffer(rfbClientPtr cl, uint32_t length);
+DLLEXPORT extern rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t contentParam, uint32_t size, uint32_t length);
 
-void rfbGotXCutText(rfbScreenInfoPtr rfbScreen, char *str, int len);
+DLLEXPORT void rfbGotXCutText(rfbScreenInfoPtr rfbScreen, char *str, int len);
 
 /* translate.c */
 
-extern rfbBool rfbEconomicTranslate;
+DLLEXPORT extern rfbBool rfbEconomicTranslate;
 
-extern void rfbTranslateNone(char *table, rfbPixelFormat *in,
+DLLEXPORT extern void rfbTranslateNone(char *table, rfbPixelFormat *in,
                              rfbPixelFormat *out,
                              char *iptr, char *optr,
                              int bytesBetweenInputLines,
                              int width, int height);
-extern rfbBool rfbSetTranslateFunction(rfbClientPtr cl);
-extern rfbBool rfbSetClientColourMap(rfbClientPtr cl, int firstColour, int nColours);
-extern void rfbSetClientColourMaps(rfbScreenInfoPtr rfbScreen, int firstColour, int nColours);
+DLLEXPORT extern rfbBool rfbSetTranslateFunction(rfbClientPtr cl);
+DLLEXPORT extern rfbBool rfbSetClientColourMap(rfbClientPtr cl, int firstColour, int nColours);
+DLLEXPORT extern void rfbSetClientColourMaps(rfbScreenInfoPtr rfbScreen, int firstColour, int nColours);
 
 /* httpd.c */
 
-extern void rfbHttpInitSockets(rfbScreenInfoPtr rfbScreen);
-extern void rfbHttpShutdownSockets(rfbScreenInfoPtr rfbScreen);
-extern void rfbHttpCheckFds(rfbScreenInfoPtr rfbScreen);
+DLLEXPORT extern void rfbHttpInitSockets(rfbScreenInfoPtr rfbScreen);
+DLLEXPORT extern void rfbHttpShutdownSockets(rfbScreenInfoPtr rfbScreen);
+DLLEXPORT extern void rfbHttpCheckFds(rfbScreenInfoPtr rfbScreen);
 
 
 
 /* auth.c */
 
-extern void rfbAuthNewClient(rfbClientPtr cl);
-extern void rfbProcessClientSecurityType(rfbClientPtr cl);
-extern void rfbAuthProcessClientMessage(rfbClientPtr cl);
-extern void rfbRegisterSecurityHandler(rfbSecurityHandler* handler);
-extern void rfbUnregisterSecurityHandler(rfbSecurityHandler* handler);
+DLLEXPORT extern void rfbAuthNewClient(rfbClientPtr cl);
+DLLEXPORT extern void rfbProcessClientSecurityType(rfbClientPtr cl);
+DLLEXPORT extern void rfbAuthProcessClientMessage(rfbClientPtr cl);
+DLLEXPORT extern void rfbRegisterSecurityHandler(rfbSecurityHandler* handler);
+DLLEXPORT extern void rfbUnregisterSecurityHandler(rfbSecurityHandler* handler);
 
 /* rre.c */
 
-extern rfbBool rfbSendRectEncodingRRE(rfbClientPtr cl, int x,int y,int w,int h);
+DLLEXPORT extern rfbBool rfbSendRectEncodingRRE(rfbClientPtr cl, int x,int y,int w,int h);
 
 
 /* corre.c */
 
-extern rfbBool rfbSendRectEncodingCoRRE(rfbClientPtr cl, int x,int y,int w,int h);
+DLLEXPORT extern rfbBool rfbSendRectEncodingCoRRE(rfbClientPtr cl, int x,int y,int w,int h);
 
 
 /* hextile.c */
 
-extern rfbBool rfbSendRectEncodingHextile(rfbClientPtr cl, int x, int y, int w,
+DLLEXPORT extern rfbBool rfbSendRectEncodingHextile(rfbClientPtr cl, int x, int y, int w,
                                        int h);
 
 /* ultra.c */
@@ -861,7 +840,7 @@ extern rfbBool rfbSendRectEncodingHextile(rfbClientPtr cl, int x, int y, int w,
 #define ULTRA_MAX_SIZE(min) ((( min * 2 ) > ULTRA_MAX_RECT_SIZE ) ? \
                             ( min * 2 ) : ULTRA_MAX_RECT_SIZE )
 
-extern rfbBool rfbSendRectEncodingUltra(rfbClientPtr cl, int x,int y,int w,int h);
+DLLEXPORT extern rfbBool rfbSendRectEncodingUltra(rfbClientPtr cl, int x,int y,int w,int h);
 
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
@@ -879,7 +858,7 @@ extern rfbBool rfbSendRectEncodingUltra(rfbClientPtr cl, int x,int y,int w,int h
 #define ZLIB_MAX_SIZE(min) ((( min * 2 ) > ZLIB_MAX_RECT_SIZE ) ? \
 			    ( min * 2 ) : ZLIB_MAX_RECT_SIZE )
 
-extern rfbBool rfbSendRectEncodingZlib(rfbClientPtr cl, int x, int y, int w,
+DLLEXPORT extern rfbBool rfbSendRectEncodingZlib(rfbClientPtr cl, int x, int y, int w,
 				    int h);
 
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
@@ -890,12 +869,12 @@ extern rfbBool rfbSendRectEncodingZlib(rfbClientPtr cl, int x, int y, int w,
 
 extern rfbBool rfbTightDisableGradient;
 
-extern int rfbNumCodedRectsTight(rfbClientPtr cl, int x,int y,int w,int h);
+DLLEXPORT extern int rfbNumCodedRectsTight(rfbClientPtr cl, int x,int y,int w,int h);
 
-extern rfbBool rfbSendRectEncodingTight(rfbClientPtr cl, int x,int y,int w,int h);
+DLLEXPORT extern rfbBool rfbSendRectEncodingTight(rfbClientPtr cl, int x,int y,int w,int h);
 
 #if defined(LIBVNCSERVER_HAVE_LIBPNG)
-extern rfbBool rfbSendRectEncodingTightPng(rfbClientPtr cl, int x,int y,int w,int h);
+DLLEXPORT extern rfbBool rfbSendRectEncodingTightPng(rfbClientPtr cl, int x,int y,int w,int h);
 #endif
 
 #endif
@@ -918,29 +897,29 @@ typedef struct rfbCursor {
 } rfbCursor, *rfbCursorPtr;
 extern unsigned char rfbReverseByte[0x100];
 
-extern rfbBool rfbSendCursorShape(rfbClientPtr cl/*, rfbScreenInfoPtr pScreen*/);
-extern rfbBool rfbSendCursorPos(rfbClientPtr cl);
-extern void rfbConvertLSBCursorBitmapOrMask(int width,int height,unsigned char* bitmap);
-extern rfbCursorPtr rfbMakeXCursor(int width,int height,char* cursorString,char* maskString);
-extern char* rfbMakeMaskForXCursor(int width,int height,char* cursorString);
-extern char* rfbMakeMaskFromAlphaSource(int width,int height,unsigned char* alphaSource);
-extern void rfbMakeXCursorFromRichCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor);
-extern void rfbMakeRichCursorFromXCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor);
-extern void rfbFreeCursor(rfbCursorPtr cursor);
-extern void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c);
+DLLEXPORT extern rfbBool rfbSendCursorShape(rfbClientPtr cl/*, rfbScreenInfoPtr pScreen*/);
+DLLEXPORT extern rfbBool rfbSendCursorPos(rfbClientPtr cl);
+DLLEXPORT extern void rfbConvertLSBCursorBitmapOrMask(int width,int height,unsigned char* bitmap);
+DLLEXPORT extern rfbCursorPtr rfbMakeXCursor(int width,int height,char* cursorString,char* maskString);
+DLLEXPORT extern char* rfbMakeMaskForXCursor(int width,int height,char* cursorString);
+DLLEXPORT extern char* rfbMakeMaskFromAlphaSource(int width,int height,unsigned char* alphaSource);
+DLLEXPORT extern void rfbMakeXCursorFromRichCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor);
+DLLEXPORT extern void rfbMakeRichCursorFromXCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor);
+DLLEXPORT extern void rfbFreeCursor(rfbCursorPtr cursor);
+DLLEXPORT extern void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c);
 
 /** cursor handling for the pointer */
-extern void rfbDefaultPtrAddEvent(int buttonMask,int x,int y,rfbClientPtr cl);
+DLLEXPORT extern void rfbDefaultPtrAddEvent(int buttonMask,int x,int y,rfbClientPtr cl);
 
 /* zrle.c */
 #ifdef LIBVNCSERVER_HAVE_LIBZ
-extern rfbBool rfbSendRectEncodingZRLE(rfbClientPtr cl, int x, int y, int w,int h);
+DLLEXPORT extern rfbBool rfbSendRectEncodingZRLE(rfbClientPtr cl, int x, int y, int w,int h);
 #endif
 
 /* stats.c */
 
-extern void rfbResetStats(rfbClientPtr cl);
-extern void rfbPrintStats(rfbClientPtr cl);
+DLLEXPORT extern void rfbResetStats(rfbClientPtr cl);
+DLLEXPORT extern void rfbPrintStats(rfbClientPtr cl);
 
 /* font.c */
 
@@ -954,27 +933,27 @@ typedef struct rfbFontData {
   int* metaData;
 } rfbFontData,* rfbFontDataPtr;
 
-int rfbDrawChar(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,unsigned char c,rfbPixel colour);
-void rfbDrawString(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,const char* string,rfbPixel colour);
+DLLEXPORT int rfbDrawChar(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,unsigned char c,rfbPixel colour);
+DLLEXPORT void rfbDrawString(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,const char* string,rfbPixel colour);
 /** if colour==backColour, background is transparent */
-int rfbDrawCharWithClip(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,unsigned char c,int x1,int y1,int x2,int y2,rfbPixel colour,rfbPixel backColour);
-void rfbDrawStringWithClip(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,const char* string,int x1,int y1,int x2,int y2,rfbPixel colour,rfbPixel backColour);
-int rfbWidthOfString(rfbFontDataPtr font,const char* string);
-int rfbWidthOfChar(rfbFontDataPtr font,unsigned char c);
-void rfbFontBBox(rfbFontDataPtr font,unsigned char c,int* x1,int* y1,int* x2,int* y2);
+DLLEXPORT int rfbDrawCharWithClip(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,unsigned char c,int x1,int y1,int x2,int y2,rfbPixel colour,rfbPixel backColour);
+DLLEXPORT void rfbDrawStringWithClip(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,const char* string,int x1,int y1,int x2,int y2,rfbPixel colour,rfbPixel backColour);
+DLLEXPORT int rfbWidthOfString(rfbFontDataPtr font,const char* string);
+DLLEXPORT int rfbWidthOfChar(rfbFontDataPtr font,unsigned char c);
+DLLEXPORT void rfbFontBBox(rfbFontDataPtr font,unsigned char c,int* x1,int* y1,int* x2,int* y2);
 /** this returns the smallest box enclosing any character of font. */
-void rfbWholeFontBBox(rfbFontDataPtr font,int *x1, int *y1, int *x2, int *y2);
+DLLEXPORT void rfbWholeFontBBox(rfbFontDataPtr font,int *x1, int *y1, int *x2, int *y2);
 
 /** dynamically load a linux console font (4096 bytes, 256 glyphs a 8x16 */
-rfbFontDataPtr rfbLoadConsoleFont(char *filename);
+DLLEXPORT rfbFontDataPtr rfbLoadConsoleFont(char *filename);
 /** free a dynamically loaded font */
-void rfbFreeFont(rfbFontDataPtr font);
+DLLEXPORT void rfbFreeFont(rfbFontDataPtr font);
 
 /* draw.c */
 
-void rfbFillRect(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2,rfbPixel col);
-void rfbDrawPixel(rfbScreenInfoPtr s,int x,int y,rfbPixel col);
-void rfbDrawLine(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2,rfbPixel col);
+DLLEXPORT void rfbFillRect(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2,rfbPixel col);
+DLLEXPORT void rfbDrawPixel(rfbScreenInfoPtr s,int x,int y,rfbPixel col);
+DLLEXPORT void rfbDrawLine(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2,rfbPixel col);
 
 /* selbox.c */
 
@@ -983,7 +962,7 @@ void rfbDrawLine(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2,rfbPixel col);
    It returns the index in the list or -1 if cancelled or something else
    wasn't kosher. */
 typedef void (*SelectionChangedHookPtr)(int _index);
-extern int rfbSelectBox(rfbScreenInfoPtr rfbScreen,
+DLLEXPORT extern int rfbSelectBox(rfbScreenInfoPtr rfbScreen,
 			rfbFontDataPtr font, char** list,
 			int x1, int y1, int x2, int y2,
 			rfbPixel foreColour, rfbPixel backColour,
@@ -991,58 +970,60 @@ extern int rfbSelectBox(rfbScreenInfoPtr rfbScreen,
 
 /* cargs.c */
 
-extern void rfbUsage(void);
-extern void rfbPurgeArguments(int* argc,int* position,int count,char *argv[]);
-extern rfbBool rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[]);
-extern rfbBool rfbProcessSizeArguments(int* width,int* height,int* bpp,int* argc, char *argv[]);
+DLLEXPORT extern void rfbUsage(void);
+DLLEXPORT extern void rfbPurgeArguments(int* argc,int* position,int count,char *argv[]);
+DLLEXPORT extern rfbBool rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[]);
+DLLEXPORT extern rfbBool rfbProcessSizeArguments(int* width,int* height,int* bpp,int* argc, char *argv[]);
 
 /* main.c */
 
-extern void rfbLogEnable(int enabled);
-typedef void (*rfbLogProc)(const char *format, ...);
-extern rfbLogProc rfbLog, rfbErr;
-extern void rfbLogPerror(const char *str);
+#define rfbLog rfbDefaultLog
+#define rfbErr rfbDefaultLog
 
-void rfbScheduleCopyRect(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y2,int dx,int dy);
-void rfbScheduleCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,int dx,int dy);
+DLLEXPORT extern void rfbLogEnable(int enabled);
+DLLEXPORT void rfbDefaultLog(const char *format, ...);
+DLLEXPORT extern void rfbLogPerror(const char *str);
 
-void rfbDoCopyRect(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y2,int dx,int dy);
-void rfbDoCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,int dx,int dy);
+DLLEXPORT void rfbScheduleCopyRect(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y2,int dx,int dy);
+DLLEXPORT void rfbScheduleCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,int dx,int dy);
 
-void rfbMarkRectAsModified(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y2);
-void rfbMarkRegionAsModified(rfbScreenInfoPtr rfbScreen,sraRegionPtr modRegion);
-void rfbDoNothingWithClient(rfbClientPtr cl);
-enum rfbNewClientAction defaultNewClientHook(rfbClientPtr cl);
-void rfbRegisterProtocolExtension(rfbProtocolExtension* extension);
-void rfbUnregisterProtocolExtension(rfbProtocolExtension* extension);
-struct _rfbProtocolExtension* rfbGetExtensionIterator();
-void rfbReleaseExtensionIterator();
-rfbBool rfbEnableExtension(rfbClientPtr cl, rfbProtocolExtension* extension,
+DLLEXPORT void rfbDoCopyRect(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y2,int dx,int dy);
+DLLEXPORT void rfbDoCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,int dx,int dy);
+
+DLLEXPORT void rfbMarkRectAsModified(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y2);
+DLLEXPORT void rfbMarkRegionAsModified(rfbScreenInfoPtr rfbScreen,sraRegionPtr modRegion);
+DLLEXPORT void rfbDoNothingWithClient(rfbClientPtr cl);
+DLLEXPORT enum rfbNewClientAction defaultNewClientHook(rfbClientPtr cl);
+DLLEXPORT void rfbRegisterProtocolExtension(rfbProtocolExtension* extension);
+DLLEXPORT void rfbUnregisterProtocolExtension(rfbProtocolExtension* extension);
+DLLEXPORT struct _rfbProtocolExtension* rfbGetExtensionIterator();
+DLLEXPORT void rfbReleaseExtensionIterator();
+DLLEXPORT rfbBool rfbEnableExtension(rfbClientPtr cl, rfbProtocolExtension* extension,
 	void* data);
-rfbBool rfbDisableExtension(rfbClientPtr cl, rfbProtocolExtension* extension);
-void* rfbGetExtensionClientData(rfbClientPtr cl, rfbProtocolExtension* extension);
+DLLEXPORT rfbBool rfbDisableExtension(rfbClientPtr cl, rfbProtocolExtension* extension);
+DLLEXPORT void* rfbGetExtensionClientData(rfbClientPtr cl, rfbProtocolExtension* extension);
 
 /** to check against plain passwords */
-rfbBool rfbCheckPasswordByList(rfbClientPtr cl,const char* response,int len);
+DLLEXPORT rfbBool rfbCheckPasswordByList(rfbClientPtr cl,const char* response,int len);
 
 /* functions to make a vnc server */
-extern rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
+DLLEXPORT extern rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
  int width,int height,int bitsPerSample,int samplesPerPixel,
  int bytesPerPixel);
-extern void rfbInitServer(rfbScreenInfoPtr rfbScreen);
-extern void rfbShutdownServer(rfbScreenInfoPtr rfbScreen,rfbBool disconnectClients);
-extern void rfbNewFramebuffer(rfbScreenInfoPtr rfbScreen,char *framebuffer,
+DLLEXPORT extern void rfbInitServer(rfbScreenInfoPtr rfbScreen);
+DLLEXPORT extern void rfbShutdownServer(rfbScreenInfoPtr rfbScreen,rfbBool disconnectClients);
+DLLEXPORT extern void rfbNewFramebuffer(rfbScreenInfoPtr rfbScreen,char *framebuffer,
  int width,int height, int bitsPerSample,int samplesPerPixel,
  int bytesPerPixel);
 
-extern void rfbScreenCleanup(rfbScreenInfoPtr screenInfo);
-extern void rfbSetServerVersionIdentity(rfbScreenInfoPtr screen, char *fmt, ...);
+DLLEXPORT extern void rfbScreenCleanup(rfbScreenInfoPtr screenInfo);
+DLLEXPORT extern void rfbSetServerVersionIdentity(rfbScreenInfoPtr screen, char *fmt, ...);
 
 /* functions to accept/refuse a client that has been put on hold
    by a NewClientHookPtr function. Must not be called in other
    situations. */
-extern void rfbStartOnHoldClient(rfbClientPtr cl);
-extern void rfbRefuseOnHoldClient(rfbClientPtr cl);
+DLLEXPORT extern void rfbStartOnHoldClient(rfbClientPtr cl);
+DLLEXPORT extern void rfbRefuseOnHoldClient(rfbClientPtr cl);
 
 /* call one of these two functions to service the vnc clients.
  usec are the microseconds the select on the fds waits.
@@ -1050,53 +1031,53 @@ extern void rfbRefuseOnHoldClient(rfbClientPtr cl);
  server doesn't get a high load just by listening.
  rfbProcessEvents() returns TRUE if an update was pending. */
 
-extern void rfbRunEventLoop(rfbScreenInfoPtr screenInfo, long usec, rfbBool runInBackground);
-extern rfbBool rfbProcessEvents(rfbScreenInfoPtr screenInfo,long usec);
-extern rfbBool rfbIsActive(rfbScreenInfoPtr screenInfo);
+DLLEXPORT extern void rfbRunEventLoop(rfbScreenInfoPtr screenInfo, long usec, rfbBool runInBackground);
+DLLEXPORT extern rfbBool rfbProcessEvents(rfbScreenInfoPtr screenInfo,long usec);
+DLLEXPORT extern rfbBool rfbIsActive(rfbScreenInfoPtr screenInfo);
 
 /* TightVNC file transfer extension */
-void rfbRegisterTightVNCFileTransferExtension();
-void rfbUnregisterTightVNCFileTransferExtension();
+DLLEXPORT void rfbRegisterTightVNCFileTransferExtension();
+DLLEXPORT void rfbUnregisterTightVNCFileTransferExtension();
 
 /* Statistics */
-extern char *messageNameServer2Client(uint32_t type, char *buf, int len);
-extern char *messageNameClient2Server(uint32_t type, char *buf, int len);
-extern char *encodingName(uint32_t enc, char *buf, int len);
+DLLEXPORT extern char *messageNameServer2Client(uint32_t type, char *buf, int len);
+DLLEXPORT extern char *messageNameClient2Server(uint32_t type, char *buf, int len);
+DLLEXPORT extern char *encodingName(uint32_t enc, char *buf, int len);
 
-extern rfbStatList *rfbStatLookupEncoding(rfbClientPtr cl, uint32_t type);
-extern rfbStatList *rfbStatLookupMessage(rfbClientPtr cl, uint32_t type);
+DLLEXPORT extern rfbStatList *rfbStatLookupEncoding(rfbClientPtr cl, uint32_t type);
+DLLEXPORT extern rfbStatList *rfbStatLookupMessage(rfbClientPtr cl, uint32_t type);
 
 /* Each call to rfbStatRecord* adds one to the rect count for that type */
-extern void rfbStatRecordEncodingSent(rfbClientPtr cl, uint32_t type, int byteCount, int byteIfRaw);
-extern void rfbStatRecordEncodingSentAdd(rfbClientPtr cl, uint32_t type, int byteCount); /* Specifically for tight encoding */
-extern void rfbStatRecordEncodingRcvd(rfbClientPtr cl, uint32_t type, int byteCount, int byteIfRaw);
-extern void rfbStatRecordMessageSent(rfbClientPtr cl, uint32_t type, int byteCount, int byteIfRaw);
-extern void rfbStatRecordMessageRcvd(rfbClientPtr cl, uint32_t type, int byteCount, int byteIfRaw);
-extern void rfbResetStats(rfbClientPtr cl);
-extern void rfbPrintStats(rfbClientPtr cl);
+DLLEXPORT extern void rfbStatRecordEncodingSent(rfbClientPtr cl, uint32_t type, int byteCount, int byteIfRaw);
+DLLEXPORT extern void rfbStatRecordEncodingSentAdd(rfbClientPtr cl, uint32_t type, int byteCount); /* Specifically for tight encoding */
+DLLEXPORT extern void rfbStatRecordEncodingRcvd(rfbClientPtr cl, uint32_t type, int byteCount, int byteIfRaw);
+DLLEXPORT extern void rfbStatRecordMessageSent(rfbClientPtr cl, uint32_t type, int byteCount, int byteIfRaw);
+DLLEXPORT extern void rfbStatRecordMessageRcvd(rfbClientPtr cl, uint32_t type, int byteCount, int byteIfRaw);
+DLLEXPORT extern void rfbResetStats(rfbClientPtr cl);
+DLLEXPORT extern void rfbPrintStats(rfbClientPtr cl);
 
-extern int rfbStatGetSentBytes(rfbClientPtr cl);
-extern int rfbStatGetSentBytesIfRaw(rfbClientPtr cl);
-extern int rfbStatGetRcvdBytes(rfbClientPtr cl);
-extern int rfbStatGetRcvdBytesIfRaw(rfbClientPtr cl);
-extern int rfbStatGetMessageCountSent(rfbClientPtr cl, uint32_t type);
-extern int rfbStatGetMessageCountRcvd(rfbClientPtr cl, uint32_t type);
-extern int rfbStatGetEncodingCountSent(rfbClientPtr cl, uint32_t type);
-extern int rfbStatGetEncodingCountRcvd(rfbClientPtr cl, uint32_t type);
+DLLEXPORT extern int rfbStatGetSentBytes(rfbClientPtr cl);
+DLLEXPORT extern int rfbStatGetSentBytesIfRaw(rfbClientPtr cl);
+DLLEXPORT extern int rfbStatGetRcvdBytes(rfbClientPtr cl);
+DLLEXPORT extern int rfbStatGetRcvdBytesIfRaw(rfbClientPtr cl);
+DLLEXPORT extern int rfbStatGetMessageCountSent(rfbClientPtr cl, uint32_t type);
+DLLEXPORT extern int rfbStatGetMessageCountRcvd(rfbClientPtr cl, uint32_t type);
+DLLEXPORT extern int rfbStatGetEncodingCountSent(rfbClientPtr cl, uint32_t type);
+DLLEXPORT extern int rfbStatGetEncodingCountRcvd(rfbClientPtr cl, uint32_t type);
 
 /** Set which version you want to advertise 3.3, 3.6, 3.7 and 3.8 are currently supported*/
-extern void rfbSetProtocolVersion(rfbScreenInfoPtr rfbScreen, int major_, int minor_);
+DLLEXPORT extern void rfbSetProtocolVersion(rfbScreenInfoPtr rfbScreen, int major_, int minor_);
 
 /** send a TextChat message to a client */
-extern rfbBool rfbSendTextChatMessage(rfbClientPtr cl, uint32_t length, char *buffer);
+DLLEXPORT extern rfbBool rfbSendTextChatMessage(rfbClientPtr cl, uint32_t length, char *buffer);
 
 
 /*
  * Additions for Qt event loop integration
  * Original idea taken from vino.
  */
-rfbBool rfbProcessNewConnection(rfbScreenInfoPtr rfbScreen);
-rfbBool rfbUpdateClient(rfbClientPtr cl);
+DLLEXPORT rfbBool rfbProcessNewConnection(rfbScreenInfoPtr rfbScreen);
+DLLEXPORT rfbBool rfbUpdateClient(rfbClientPtr cl);
 
 
 #if(defined __cplusplus)

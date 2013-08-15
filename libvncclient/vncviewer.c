@@ -31,6 +31,7 @@
 #include <time.h>
 #include <rfb/rfbclient.h>
 #include "tls.h"
+#include "private.h"
 
 static void Dummy(rfbClient* client) {
 }
@@ -40,7 +41,7 @@ static rfbBool DummyPoint(rfbClient* client, int x, int y) {
 static void DummyRect(rfbClient* client, int x, int y, int w, int h) {
 }
 
-#ifdef __MINGW32__
+#ifdef __MINGW32__ 
 static char* NoPassword(rfbClient* client) {
   return strdup("");
 }
@@ -49,13 +50,24 @@ static char* NoPassword(rfbClient* client) {
 #define close closesocket
 #else
 #include <stdio.h>
+#ifndef _MSC_VER
 #include <termios.h>
+#endif
+#endif
+
+#ifdef _MSC_VER
+static char* NoPassword(rfbClient* client) {
+  return _strdup("");
+}
 #endif
 
 static char* ReadPassword(rfbClient* client) {
 #ifdef __MINGW32__
 	/* FIXME */
 	rfbClientErr("ReadPassword on MinGW32 NOT IMPLEMENTED\n");
+	return NoPassword(client);
+#elif defined(_MSC_VER)
+	rfbClientErr("ReadPassword on Windows NOT IMPLEMENTED\n");
 	return NoPassword(client);
 #else
 	int i;
@@ -113,11 +125,13 @@ static void initAppData(AppData* data) {
 
 rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
 			int bytesPerPixel) {
-  rfbClient* client=(rfbClient*)calloc(sizeof(rfbClient),1);
+  struct rfbClientPrivate *priv;
+  rfbClient* client=rfbClientAlloc();
   if(!client) {
     rfbClientErr("Couldn't allocate client structure!\n");
     return NULL;
   }
+  priv = RFB_CLIENT_PRIV(client);
   initAppData(&client->appData);
   client->endianTest = 1;
   client->programName="";
@@ -175,11 +189,11 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
   client->raw_buffer_size = -1;
-  client->decompStreamInited = FALSE;
+  priv->decompStreamInited = FALSE;
 
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
-  memset(client->zlibStreamActive,0,sizeof(rfbBool)*4);
-  client->jpegSrcManager = NULL;
+  memset(priv->zlibStreamActive,0,sizeof(rfbBool)*4);
+  priv->jpegSrcManager = NULL;
 #endif
 #endif
 
@@ -349,24 +363,26 @@ rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
 void rfbClientCleanup(rfbClient* client) {
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
+  struct rfbClientPrivate *priv;
   int i;
 
+  priv = RFB_CLIENT_PRIV(client);
   for ( i = 0; i < 4; i++ ) {
-    if (client->zlibStreamActive[i] == TRUE ) {
-      if (inflateEnd (&client->zlibStream[i]) != Z_OK &&
-	  client->zlibStream[i].msg != NULL)
-	rfbClientLog("inflateEnd: %s\n", client->zlibStream[i].msg);
+    if (priv->zlibStreamActive[i] == TRUE ) {
+      if (inflateEnd (&priv->zlibStream[i]) != Z_OK &&
+	  priv->zlibStream[i].msg != NULL)
+	rfbClientLog("inflateEnd: %s\n", priv->zlibStream[i].msg);
     }
   }
 
-  if ( client->decompStreamInited == TRUE ) {
-    if (inflateEnd (&client->decompStream) != Z_OK &&
-	client->decompStream.msg != NULL)
-      rfbClientLog("inflateEnd: %s\n", client->decompStream.msg );
+  if ( priv->decompStreamInited == TRUE ) {
+    if (inflateEnd (&priv->decompStream) != Z_OK &&
+	priv->decompStream.msg != NULL)
+      rfbClientLog("inflateEnd: %s\n", priv->decompStream.msg );
   }
 
-  if (client->jpegSrcManager)
-    free(client->jpegSrcManager);
+  if (priv->jpegSrcManager)
+    free(priv->jpegSrcManager);
 #endif
 #endif
 

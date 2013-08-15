@@ -34,8 +34,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef LIBVNCSERVER_HAVE_SYS_TIME_H 
 #include <sys/time.h>
+#endif
+#ifdef LIBVNCSERVER_HAVE_UNISTD_H
 #include <unistd.h>
+#endif
 #include <rfb/rfbproto.h>
 #include <rfb/keysym.h>
 
@@ -72,6 +76,12 @@
 #if(defined __cplusplus)
 extern "C"
 {
+#endif
+
+#if defined(_MSC_VER) && defined(DLLDEFINE)
+#define DLLEXPORT __declspec(dllexport)
+#else
+#define DLLEXPORT
 #endif
 
 /** vncrec */
@@ -228,43 +238,6 @@ typedef struct _rfbClient {
 	int raw_buffer_size;
 	char *raw_buffer;
 
-#ifdef LIBVNCSERVER_HAVE_LIBZ
-	z_stream decompStream;
-	rfbBool decompStreamInited;
-#endif
-
-
-#ifdef LIBVNCSERVER_HAVE_LIBZ
-	/*
-	 * Variables for the ``tight'' encoding implementation.
-	 */
-
-	/** Separate buffer for compressed data. */
-#define ZLIB_BUFFER_SIZE 30000
-	char zlib_buffer[ZLIB_BUFFER_SIZE];
-
-	/* Four independent compression streams for zlib library. */
-	z_stream zlibStream[4];
-	rfbBool zlibStreamActive[4];
-
-	/* Filter stuff. Should be initialized by filter initialization code. */
-	rfbBool cutZeros;
-	int rectWidth, rectColors;
-	char tightPalette[256*4];
-	uint8_t tightPrevRow[2048*3*sizeof(uint16_t)];
-
-#ifdef LIBVNCSERVER_HAVE_LIBJPEG
-	/** JPEG decoder state. */
-	rfbBool jpegError;
-
-	struct jpeg_source_mgr* jpegSrcManager;
-	void* jpegBufferPtr;
-	size_t jpegBufferLen;
-
-#endif
-#endif
-
-
 	/* cursor.c */
 	uint8_t *rcSource, *rcMask;
 
@@ -354,22 +327,24 @@ typedef struct _rfbClient {
 
 /* cursor.c */
 
-extern rfbBool HandleCursorShape(rfbClient* client,int xhot, int yhot, int width, int height, uint32_t enc);
+DLLEXPORT extern rfbBool HandleCursorShape(rfbClient* client,int xhot, int yhot, int width, int height, uint32_t enc);
 
 /* listen.c */
 
-extern void listenForIncomingConnections(rfbClient* viewer);
-extern int listenForIncomingConnectionsNoFork(rfbClient* viewer, int usec_timeout);
+DLLEXPORT extern void listenForIncomingConnections(rfbClient* viewer);
+DLLEXPORT extern int listenForIncomingConnectionsNoFork(rfbClient* viewer, int usec_timeout);
 
 /* rfbproto.c */
 
 extern rfbBool rfbEnableClientLogging;
-typedef void (*rfbClientLogProc)(const char *format, ...);
-extern rfbClientLogProc rfbClientLog,rfbClientErr;
-extern rfbBool ConnectToRFBServer(rfbClient* client,const char *hostname, int port);
-extern rfbBool ConnectToRFBRepeater(rfbClient* client,const char *repeaterHost, int repeaterPort, const char *destHost, int destPort);
-extern void SetClientAuthSchemes(rfbClient* client,const uint32_t *authSchemes, int size);
-extern rfbBool InitialiseRFBConnection(rfbClient* client);
+#define rfbClientErr rfbDefaultClientLog
+#define rfbClientLog rfbDefaultClientLog
+
+DLLEXPORT void rfbDefaultClientLog(const char *format, ...);
+DLLEXPORT extern rfbBool ConnectToRFBServer(rfbClient* client,const char *hostname, int port);
+DLLEXPORT extern rfbBool ConnectToRFBRepeater(rfbClient* client,const char *repeaterHost, int repeaterPort, const char *destHost, int destPort);
+DLLEXPORT extern void SetClientAuthSchemes(rfbClient* client,const uint32_t *authSchemes, int size);
+DLLEXPORT extern rfbBool InitialiseRFBConnection(rfbClient* client);
 /**
  * Sends format and encoding parameters to the server. Your application can
  * modify the 'client' data structure directly. However some changes to this
@@ -387,8 +362,8 @@ extern rfbBool InitialiseRFBConnection(rfbClient* client);
  * @return true if the format or encodings were sent to the server successfully,
  * false otherwise
  */
-extern rfbBool SetFormatAndEncodings(rfbClient* client);
-extern rfbBool SendIncrementalFramebufferUpdateRequest(rfbClient* client);
+DLLEXPORT extern rfbBool SetFormatAndEncodings(rfbClient* client);
+DLLEXPORT extern rfbBool SendIncrementalFramebufferUpdateRequest(rfbClient* client);
 /**
  * Sends a framebuffer update request to the server. A VNC client may request an
  * update from the server at any time. You can also specify which portions of
@@ -409,10 +384,10 @@ extern rfbBool SendIncrementalFramebufferUpdateRequest(rfbClient* client);
  * true: server only sends changed parts of rectangle.
  * @return true if the update request was sent successfully, false otherwise
  */
-extern rfbBool SendFramebufferUpdateRequest(rfbClient* client,
+DLLEXPORT extern rfbBool SendFramebufferUpdateRequest(rfbClient* client,
 					 int x, int y, int w, int h,
 					 rfbBool incremental);
-extern rfbBool SendScaleSetting(rfbClient* client,int scaleSetting);
+DLLEXPORT extern rfbBool SendScaleSetting(rfbClient* client,int scaleSetting);
 /**
  * Sends a pointer event to the server. A pointer event includes a cursor
  * location and a button mask. The button mask indicates which buttons on the
@@ -433,7 +408,7 @@ extern rfbBool SendScaleSetting(rfbClient* client,int scaleSetting);
  * @param buttonMask the button mask indicating which buttons are pressed
  * @return true if the pointer event was sent successfully, false otherwise
  */
-extern rfbBool SendPointerEvent(rfbClient* client,int x, int y, int buttonMask);
+DLLEXPORT extern rfbBool SendPointerEvent(rfbClient* client,int x, int y, int buttonMask);
 /**
  * Sends a key event to the server. If your application is not merely a VNC
  * viewer (i.e. it controls the server), you'll want to send the keys that the
@@ -443,7 +418,7 @@ extern rfbBool SendPointerEvent(rfbClient* client,int x, int y, int buttonMask);
  * @param down true if this was a key down event, false otherwise
  * @return true if the key event was send successfully, false otherwise
  */
-extern rfbBool SendKeyEvent(rfbClient* client,uint32_t key, rfbBool down);
+DLLEXPORT extern rfbBool SendKeyEvent(rfbClient* client,uint32_t key, rfbBool down);
 /**
  * Places a string on the server's clipboard. Use this function if you want to
  * be able to copy and paste between the server and your application. For
@@ -456,7 +431,7 @@ extern rfbBool SendKeyEvent(rfbClient* client,uint32_t key, rfbBool down);
  * @param len The length of the string
  * @return true if the client cut message was sent successfully, false otherwise
  */
-extern rfbBool SendClientCutText(rfbClient* client,char *str, int len);
+DLLEXPORT extern rfbBool SendClientCutText(rfbClient* client,char *str, int len);
 /**
  * Handles messages from the RFB server. You must call this function
  * intermittently so LibVNCClient can parse messages from the server. For
@@ -467,7 +442,7 @@ extern rfbBool SendClientCutText(rfbClient* client,char *str, int len);
  * @return true if the client was able to handle the RFB server messages, false
  * otherwise
  */
-extern rfbBool HandleRFBServerMessage(rfbClient* client);
+DLLEXPORT extern rfbBool HandleRFBServerMessage(rfbClient* client);
 
 /**
  * Sends a text chat message to the server.
@@ -475,27 +450,27 @@ extern rfbBool HandleRFBServerMessage(rfbClient* client);
  * @param text The text to send
  * @return true if the text was sent successfully, false otherwise
  */
-extern rfbBool TextChatSend(rfbClient* client, char *text);
+DLLEXPORT extern rfbBool TextChatSend(rfbClient* client, char *text);
 /**
  * Opens a text chat window on the server.
  * @param client The client through which to send the message
  * @return true if the window was opened successfully, false otherwise
  */
-extern rfbBool TextChatOpen(rfbClient* client);
+DLLEXPORT extern rfbBool TextChatOpen(rfbClient* client);
 /**
  * Closes the text chat window on the server.
  * @param client The client through which to send the message
  * @return true if the window was closed successfully, false otherwise
  */
-extern rfbBool TextChatClose(rfbClient* client);
-extern rfbBool TextChatFinish(rfbClient* client);
-extern rfbBool PermitServerInput(rfbClient* client, int enabled);
-extern rfbBool SendXvpMsg(rfbClient* client, uint8_t version, uint8_t code);
+DLLEXPORT extern rfbBool TextChatClose(rfbClient* client);
+DLLEXPORT extern rfbBool TextChatFinish(rfbClient* client);
+DLLEXPORT extern rfbBool PermitServerInput(rfbClient* client, int enabled);
+DLLEXPORT extern rfbBool SendXvpMsg(rfbClient* client, uint8_t version, uint8_t code);
 
-extern void PrintPixelFormat(rfbPixelFormat *format);
+DLLEXPORT extern void PrintPixelFormat(rfbPixelFormat *format);
 
-extern rfbBool SupportsClient2Server(rfbClient* client, int messageType);
-extern rfbBool SupportsServer2Client(rfbClient* client, int messageType);
+DLLEXPORT extern rfbBool SupportsClient2Server(rfbClient* client, int messageType);
+DLLEXPORT extern rfbBool SupportsServer2Client(rfbClient* client, int messageType);
 
 /* client data */
 
@@ -512,7 +487,7 @@ extern rfbBool SupportsServer2Client(rfbClient* client, int messageType);
  * @param tag A unique tag which identifies the data
  * @param data A pointer to the data to associate with the tag
  */
-void rfbClientSetClientData(rfbClient* client, void* tag, void* data);
+DLLEXPORT void rfbClientSetClientData(rfbClient* client, void* tag, void* data);
 /**
  * Returns a pointer to the client data associated with the given tag. See the
  * the documentation for rfbClientSetClientData() for a discussion of how you
@@ -521,7 +496,7 @@ void rfbClientSetClientData(rfbClient* client, void* tag, void* data);
  * @param tag The tag which identifies the client data
  * @return a pointer to the client data
  */
-void* rfbClientGetClientData(rfbClient* client, void* tag);
+DLLEXPORT void* rfbClientGetClientData(rfbClient* client, void* tag);
 
 /* protocol extensions */
 
@@ -536,26 +511,26 @@ typedef struct _rfbClientProtocolExtension {
 	struct _rfbClientProtocolExtension* next;
 } rfbClientProtocolExtension;
 
-void rfbClientRegisterExtension(rfbClientProtocolExtension* e);
+DLLEXPORT void rfbClientRegisterExtension(rfbClientProtocolExtension* e);
 
 /* sockets.c */
 
-extern rfbBool errorMessageOnReadFailure;
+DLLEXPORT extern rfbBool errorMessageOnReadFailure;
 
-extern rfbBool ReadFromRFBServer(rfbClient* client, char *out, unsigned int n);
-extern rfbBool WriteToRFBServer(rfbClient* client, char *buf, int n);
-extern int FindFreeTcpPort(void);
-extern int ListenAtTcpPort(int port);
-extern int ListenAtTcpPortAndAddress(int port, const char *address);
-extern int ConnectClientToTcpAddr(unsigned int host, int port);
-extern int ConnectClientToTcpAddr6(const char *hostname, int port);
-extern int ConnectClientToUnixSock(const char *sockFile);
-extern int AcceptTcpConnection(int listenSock);
-extern rfbBool SetNonBlocking(int sock);
-extern rfbBool SetDSCP(int sock, int dscp);
+DLLEXPORT extern rfbBool ReadFromRFBServer(rfbClient* client, char *out, unsigned int n);
+DLLEXPORT extern rfbBool WriteToRFBServer(rfbClient* client, char *buf, int n);
+DLLEXPORT extern int FindFreeTcpPort(void);
+DLLEXPORT extern int ListenAtTcpPort(int port);
+DLLEXPORT extern int ListenAtTcpPortAndAddress(int port, const char *address);
+DLLEXPORT extern int ConnectClientToTcpAddr(unsigned int host, int port);
+DLLEXPORT extern int ConnectClientToTcpAddr6(const char *hostname, int port);
+DLLEXPORT extern int ConnectClientToUnixSock(const char *sockFile);
+DLLEXPORT extern int AcceptTcpConnection(int listenSock);
+DLLEXPORT extern rfbBool SetNonBlocking(int sock);
+DLLEXPORT extern rfbBool SetDSCP(int sock, int dscp);
 
-extern rfbBool StringToIPAddr(const char *str, unsigned int *addr);
-extern rfbBool SameMachine(int sock);
+DLLEXPORT extern rfbBool StringToIPAddr(const char *str, unsigned int *addr);
+DLLEXPORT extern rfbBool SameMachine(int sock);
 /**
  * Waits for an RFB message to arrive from the server. Before handling a message
  * with HandleRFBServerMessage(), you must wait for your client to receive one.
@@ -566,7 +541,7 @@ extern rfbBool SameMachine(int sock);
  * @param usecs The timeout in microseconds
  * @return the return value of the underlying select() call
  */
-extern int WaitForMessage(rfbClient* client,unsigned int usecs);
+DLLEXPORT extern int WaitForMessage(rfbClient* client,unsigned int usecs);
 
 /* vncviewer.c */
 /**
@@ -593,7 +568,7 @@ extern int WaitForMessage(rfbClient* client,unsigned int usecs);
  * @param bytesPerPixel The number of bytes in a pixel
  * @return a pointer to the allocated rfbClient structure
  */
-rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,int bytesPerPixel);
+DLLEXPORT rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,int bytesPerPixel);
 /**
  * Initializes the client. The format is {PROGRAM_NAME, [OPTIONS]..., HOST}. This
  * function does not initialize the program name if the rfbClient's program
@@ -625,7 +600,7 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,int bytesPerPixel)
  * strings
  * @return true if the client was initialized successfully, false otherwise.
  */
-rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv);
+DLLEXPORT rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv);
 /**
  * Cleans up the client structure and releases the memory allocated for it. You
  * should call this when you're done with the rfbClient structure that you
@@ -633,7 +608,7 @@ rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv);
  * @note rfbClientCleanup() does not touch client->frameBuffer.
  * @param client The client to clean up
  */
-void rfbClientCleanup(rfbClient* client);
+DLLEXPORT void rfbClientCleanup(rfbClient* client);
 
 #if(defined __cplusplus)
 }

@@ -304,7 +304,7 @@ int main(int argc,char** argv)
   /* initialize the server */
   rfbInitServer(rfbScreen);
 
-#ifndef BACKGROUND_LOOP_TEST
+#ifdef BACKGROUND_LOOP_TEST
 #ifdef USE_OWN_LOOP
   {
     int i;
@@ -320,11 +320,11 @@ int main(int argc,char** argv)
 #endif /* OWN LOOP */
 #else
 #if !defined(LIBVNCSERVER_HAVE_LIBPTHREAD)
-#error "I need pthreads for that."
+//#error "I need pthreads for that."
 #endif
 
   /* this is the non-blocking event loop; a background thread is started */
-  rfbRunEventLoop(rfbScreen,-1,TRUE);
+  rfbRunEventLoop(rfbScreen,-1,FALSE);
   fprintf(stderr, "Running background loop...\n");
   /* now we could do some cool things like rendering in idle time */
   while(1) sleep(5); /* render(); */

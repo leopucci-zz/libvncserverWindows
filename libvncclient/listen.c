@@ -25,17 +25,25 @@
 #ifdef __STRICT_ANSI__
 #define _BSD_SOURCE
 #endif
+#ifdef LIBVNCSERVER_HAVE_UNISTD_H
 #include <unistd.h>
+#endif
 #include <sys/types.h>
 #ifdef __MINGW32__
 #define close closesocket
 #include <winsock2.h>
 #undef max
 #else
+#ifdef LIBVNCSERVER_HAVE_SYS_WAIT_H
 #include <sys/wait.h>
+#endif
+#ifndef _MSC_VER
 #include <sys/utsname.h>
 #endif
+#endif
+#ifdef LIBVNCSERVER_HAVE_SYS_TIME_H
 #include <sys/time.h>
+#endif
 #include <rfb/rfbclient.h>
 
 /*
@@ -46,7 +54,7 @@
 void
 listenForIncomingConnections(rfbClient* client)
 {
-#ifdef __MINGW32__
+#if defined( __MINGW32__) || defined(_MSC_VER)
   /* FIXME */
   rfbClientErr("listenForIncomingConnections on MinGW32 NOT IMPLEMENTED\n");
   return;

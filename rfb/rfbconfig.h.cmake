@@ -76,6 +76,12 @@
 /* Define to 1 to build with websockets */
 #cmakedefine LIBVNCSERVER_WITH_WEBSOCKETS 1
 
+/* Define to 1 if you have the ws2tcpip.h */
+#cmakedefine LIBVNCSERVER_HAVE_WS2TCPIP_H 1 
+
+/* Define to 1 if you have the IPv6 */
+#cmakedefine LIBVNCSERVER_IPv6 1 
+
 /* Define to 1 if your processor stores words with the most significant byte
    first (like Motorola and SPARC, unlike Intel and VAX). */
 #cmakedefine LIBVNCSERVER_WORDS_BIGENDIAN 1

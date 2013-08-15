@@ -99,17 +99,19 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
   char *buffer2;
   int err, stream_id, compressedLen, bitsPixel;
   int bufferSize, rowSize, numRows, portionLen, rowsProcessed, extraBytes;
+  struct rfbClientPrivate *priv;
 
+  priv = RFB_CLIENT_PRIV(client);
   if (!ReadFromRFBServer(client, (char *)&comp_ctl, 1))
     return FALSE;
 
   /* Flush zlib streams if we are told by the server to do so. */
   for (stream_id = 0; stream_id < 4; stream_id++) {
-    if ((comp_ctl & 1) && client->zlibStreamActive[stream_id]) {
-      if (inflateEnd (&client->zlibStream[stream_id]) != Z_OK &&
-	  client->zlibStream[stream_id].msg != NULL)
-	rfbClientLog("inflateEnd: %s\n", client->zlibStream[stream_id].msg);
-      client->zlibStreamActive[stream_id] = FALSE;
+    if ((comp_ctl & 1) && priv->zlibStreamActive[stream_id]) {
+      if (inflateEnd (&priv->zlibStream[stream_id]) != Z_OK &&
+	  priv->zlibStream[stream_id].msg != NULL)
+	rfbClientLog("inflateEnd: %s\n", priv->zlibStream[stream_id].msg);
+      priv->zlibStreamActive[stream_id] = FALSE;
     }
     comp_ctl >>= 1;
   }
@@ -212,8 +214,8 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 
   /* Now let's initialize compression stream if needed. */
   stream_id = comp_ctl & 0x03;
-  zs = &client->zlibStream[stream_id];
-  if (!client->zlibStreamActive[stream_id]) {
+  zs = &priv->zlibStream[stream_id];
+  if (!priv->zlibStreamActive[stream_id]) {
     zs->zalloc = Z_NULL;
     zs->zfree = Z_NULL;
     zs->opaque = Z_NULL;
@@ -223,7 +225,7 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 	rfbClientLog("InflateInit error: %s.\n", zs->msg);
       return FALSE;
     }
-    client->zlibStreamActive[stream_id] = TRUE;
+    priv->zlibStreamActive[stream_id] = TRUE;
   }
 
   /* Read, decode and draw actual pixel data in a loop. */
@@ -245,12 +247,12 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
     else
       portionLen = compressedLen;
 
-    if (!ReadFromRFBServer(client, (char*)client->zlib_buffer, portionLen))
+    if (!ReadFromRFBServer(client, (char*)priv->zlib_buffer, portionLen))
       return FALSE;
 
     compressedLen -= portionLen;
 
-    zs->next_in = (Bytef *)client->zlib_buffer;
+    zs->next_in = (Bytef *)priv->zlib_buffer;
     zs->avail_in = portionLen;
 
     do {
@@ -301,15 +303,17 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 static int
 InitFilterCopyBPP (rfbClient* client, int rw, int rh)
 {
-  client->rectWidth = rw;
+  struct rfbClientPrivate *priv;
+  priv = RFB_CLIENT_PRIV(client);
+  priv->rectWidth = rw;
 
 #if BPP == 32
   if (client->format.depth == 24 && client->format.redMax == 0xFF &&
       client->format.greenMax == 0xFF && client->format.blueMax == 0xFF) {
-    client->cutZeros = TRUE;
+    priv->cutZeros = TRUE;
     return 24;
   } else {
-    client->cutZeros = FALSE;
+    priv->cutZeros = FALSE;
   }
 #endif
 
@@ -319,36 +323,39 @@ InitFilterCopyBPP (rfbClient* client, int rw, int rh)
 static void
 FilterCopyBPP (rfbClient* client, int numRows, CARDBPP *dst)
 {
-
-#if BPP == 32
   int x, y;
+  struct rfbClientPrivate *priv;
+  priv = RFB_CLIENT_PRIV(client);
+#if BPP == 32
 
-  if (client->cutZeros) {
+  if (priv->cutZeros) {
     for (y = 0; y < numRows; y++) {
-      for (x = 0; x < client->rectWidth; x++) {
-	dst[y*client->rectWidth+x] =
-	  RGB24_TO_PIXEL32(client->buffer[(y*client->rectWidth+x)*3],
-			   client->buffer[(y*client->rectWidth+x)*3+1],
-			   client->buffer[(y*client->rectWidth+x)*3+2]);
+      for (x = 0; x < priv->rectWidth; x++) {
+	dst[y*priv->rectWidth+x] =
+	  RGB24_TO_PIXEL32(client->buffer[(y*priv->rectWidth+x)*3],
+			   client->buffer[(y*priv->rectWidth+x)*3+1],
+			   client->buffer[(y*priv->rectWidth+x)*3+2]);
       }
     }
     return;
   }
 #endif
 
-  memcpy (dst, client->buffer, numRows * client->rectWidth * (BPP / 8));
+  memcpy (dst, client->buffer, numRows * priv->rectWidth * (BPP / 8));
 }
 
 static int
 InitFilterGradientBPP (rfbClient* client, int rw, int rh)
 {
   int bits;
+  struct rfbClientPrivate *priv;
+  priv = RFB_CLIENT_PRIV(client);
 
   bits = InitFilterCopyBPP(client, rw, rh);
-  if (client->cutZeros)
-    memset(client->tightPrevRow, 0, rw * 3);
+  if (priv->cutZeros)
+    memset(priv->tightPrevRow, 0, rw * 3);
   else
-    memset(client->tightPrevRow, 0, rw * 3 * sizeof(uint16_t));
+    memset(priv->tightPrevRow, 0, rw * 3 * sizeof(uint16_t));
 
   return bits;
 }
@@ -362,33 +369,35 @@ FilterGradient24 (rfbClient* client, int numRows, uint32_t *dst)
   uint8_t thisRow[2048*3];
   uint8_t pix[3];
   int est[3];
+  struct rfbClientPrivate *priv;
 
+  priv = RFB_CLIENT_PRIV(client);
   for (y = 0; y < numRows; y++) {
 
     /* First pixel in a row */
     for (c = 0; c < 3; c++) {
-      pix[c] = client->tightPrevRow[c] + client->buffer[y*client->rectWidth*3+c];
+      pix[c] = priv->tightPrevRow[c] + client->buffer[y*priv->rectWidth*3+c];
       thisRow[c] = pix[c];
     }
-    dst[y*client->rectWidth] = RGB24_TO_PIXEL32(pix[0], pix[1], pix[2]);
+    dst[y*priv->rectWidth] = RGB24_TO_PIXEL32(pix[0], pix[1], pix[2]);
 
     /* Remaining pixels of a row */
-    for (x = 1; x < client->rectWidth; x++) {
+    for (x = 1; x < priv->rectWidth; x++) {
       for (c = 0; c < 3; c++) {
-	est[c] = (int)client->tightPrevRow[x*3+c] + (int)pix[c] -
-		 (int)client->tightPrevRow[(x-1)*3+c];
+	est[c] = (int)priv->tightPrevRow[x*3+c] + (int)pix[c] -
+		 (int)priv->tightPrevRow[(x-1)*3+c];
 	if (est[c] > 0xFF) {
 	  est[c] = 0xFF;
 	} else if (est[c] < 0x00) {
 	  est[c] = 0x00;
 	}
-	pix[c] = (uint8_t)est[c] + client->buffer[(y*client->rectWidth+x)*3+c];
+	pix[c] = (uint8_t)est[c] + client->buffer[(y*priv->rectWidth+x)*3+c];
 	thisRow[x*3+c] = pix[c];
       }
-      dst[y*client->rectWidth+x] = RGB24_TO_PIXEL32(pix[0], pix[1], pix[2]);
+      dst[y*priv->rectWidth+x] = RGB24_TO_PIXEL32(pix[0], pix[1], pix[2]);
     }
 
-    memcpy(client->tightPrevRow, thisRow, client->rectWidth * 3);
+    memcpy(priv->tightPrevRow, thisRow, priv->rectWidth * 3);
   }
 }
 
@@ -397,9 +406,10 @@ FilterGradient24 (rfbClient* client, int numRows, uint32_t *dst)
 static void
 FilterGradientBPP (rfbClient* client, int numRows, CARDBPP *dst)
 {
+  struct rfbClientPrivate *priv = RFB_CLIENT_PRIV(client);
   int x, y, c;
   CARDBPP *src = (CARDBPP *)client->buffer;
-  uint16_t *thatRow = (uint16_t *)client->tightPrevRow;
+  uint16_t *thatRow = (uint16_t *)priv->tightPrevRow;
   uint16_t thisRow[2048*3];
   uint16_t pix[3];
   uint16_t max[3];
@@ -407,7 +417,7 @@ FilterGradientBPP (rfbClient* client, int numRows, CARDBPP *dst)
   int est[3];
 
 #if BPP == 32
-  if (client->cutZeros) {
+  if (priv->cutZeros) {
     FilterGradient24(client, numRows, dst);
     return;
   }
@@ -425,13 +435,13 @@ FilterGradientBPP (rfbClient* client, int numRows, CARDBPP *dst)
 
     /* First pixel in a row */
     for (c = 0; c < 3; c++) {
-      pix[c] = (uint16_t)(((src[y*client->rectWidth] >> shift[c]) + thatRow[c]) & max[c]);
+      pix[c] = (uint16_t)(((src[y*priv->rectWidth] >> shift[c]) + thatRow[c]) & max[c]);
       thisRow[c] = pix[c];
     }
-    dst[y*client->rectWidth] = RGB_TO_PIXEL(BPP, pix[0], pix[1], pix[2]);
+    dst[y*priv->rectWidth] = RGB_TO_PIXEL(BPP, pix[0], pix[1], pix[2]);
 
     /* Remaining pixels of a row */
-    for (x = 1; x < client->rectWidth; x++) {
+    for (x = 1; x < priv->rectWidth; x++) {
       for (c = 0; c < 3; c++) {
 	est[c] = (int)thatRow[x*3+c] + (int)pix[c] - (int)thatRow[(x-1)*3+c];
 	if (est[c] > (int)max[c]) {
@@ -439,12 +449,12 @@ FilterGradientBPP (rfbClient* client, int numRows, CARDBPP *dst)
 	} else if (est[c] < 0) {
 	  est[c] = 0;
 	}
-	pix[c] = (uint16_t)(((src[y*client->rectWidth+x] >> shift[c]) + est[c]) & max[c]);
+	pix[c] = (uint16_t)(((src[y*priv->rectWidth+x] >> shift[c]) + est[c]) & max[c]);
 	thisRow[x*3+c] = pix[c];
       }
-      dst[y*client->rectWidth+x] = RGB_TO_PIXEL(BPP, pix[0], pix[1], pix[2]);
+      dst[y*priv->rectWidth+x] = RGB_TO_PIXEL(BPP, pix[0], pix[1], pix[2]);
     }
-    memcpy(thatRow, thisRow, client->rectWidth * 3 * sizeof(uint16_t));
+    memcpy(thatRow, thisRow, priv->rectWidth * 3 * sizeof(uint16_t));
   }
 }
 
@@ -452,38 +462,39 @@ static int
 InitFilterPaletteBPP (rfbClient* client, int rw, int rh)
 {
   uint8_t numColors;
+  struct rfbClientPrivate *priv = RFB_CLIENT_PRIV(client);
 #if BPP == 32
   int i;
-  CARDBPP *palette = (CARDBPP *)client->tightPalette;
+  CARDBPP *palette = (CARDBPP *)priv->tightPalette;
 #endif
 
-  client->rectWidth = rw;
+  priv->rectWidth = rw;
 
   if (!ReadFromRFBServer(client, (char*)&numColors, 1))
     return 0;
 
-  client->rectColors = (int)numColors;
-  if (++client->rectColors < 2)
+  priv->rectColors = (int)numColors;
+  if (++priv->rectColors < 2)
     return 0;
 
 #if BPP == 32
   if (client->format.depth == 24 && client->format.redMax == 0xFF &&
       client->format.greenMax == 0xFF && client->format.blueMax == 0xFF) {
-    if (!ReadFromRFBServer(client, (char*)&client->tightPalette, client->rectColors * 3))
+    if (!ReadFromRFBServer(client, (char*)&priv->tightPalette, priv->rectColors * 3))
       return 0;
-    for (i = client->rectColors - 1; i >= 0; i--) {
-      palette[i] = RGB24_TO_PIXEL32(client->tightPalette[i*3],
-				    client->tightPalette[i*3+1],
-				    client->tightPalette[i*3+2]);
+    for (i = priv->rectColors - 1; i >= 0; i--) {
+      palette[i] = RGB24_TO_PIXEL32(priv->tightPalette[i*3],
+				    priv->tightPalette[i*3+1],
+				    priv->tightPalette[i*3+2]);
     }
-    return (client->rectColors == 2) ? 1 : 8;
+    return (priv->rectColors == 2) ? 1 : 8;
   }
 #endif
 
-  if (!ReadFromRFBServer(client, (char*)&client->tightPalette, client->rectColors * (BPP / 8)))
+  if (!ReadFromRFBServer(client, (char*)&priv->tightPalette, priv->rectColors * (BPP / 8)))
     return 0;
 
-  return (client->rectColors == 2) ? 1 : 8;
+  return (priv->rectColors == 2) ? 1 : 8;
 }
 
 static void
@@ -491,23 +502,26 @@ FilterPaletteBPP (rfbClient* client, int numRows, CARDBPP *dst)
 {
   int x, y, b, w;
   uint8_t *src = (uint8_t *)client->buffer;
-  CARDBPP *palette = (CARDBPP *)client->tightPalette;
+  struct rfbClientPrivate *priv;
+  CARDBPP *palette;
+  priv = RFB_CLIENT_PRIV(client);
+  palette = (CARDBPP *)priv->tightPalette;
 
-  if (client->rectColors == 2) {
-    w = (client->rectWidth + 7) / 8;
+  if (priv->rectColors == 2) {
+    w = (priv->rectWidth + 7) / 8;
     for (y = 0; y < numRows; y++) {
-      for (x = 0; x < client->rectWidth / 8; x++) {
+      for (x = 0; x < priv->rectWidth / 8; x++) {
 	for (b = 7; b >= 0; b--)
-	  dst[y*client->rectWidth+x*8+7-b] = palette[src[y*w+x] >> b & 1];
+	  dst[y*priv->rectWidth+x*8+7-b] = palette[src[y*w+x] >> b & 1];
       }
-      for (b = 7; b >= 8 - client->rectWidth % 8; b--) {
-	dst[y*client->rectWidth+x*8+7-b] = palette[src[y*w+x] >> b & 1];
+      for (b = 7; b >= 8 - priv->rectWidth % 8; b--) {
+	dst[y*priv->rectWidth+x*8+7-b] = palette[src[y*w+x] >> b & 1];
       }
     }
   } else {
     for (y = 0; y < numRows; y++)
-      for (x = 0; x < client->rectWidth; x++)
-	dst[y*client->rectWidth+x] = palette[(int)src[y*client->rectWidth+x]];
+      for (x = 0; x < priv->rectWidth; x++)
+	dst[y*priv->rectWidth+x] = palette[(int)src[y*priv->rectWidth+x]];
   }
 }
 
@@ -522,6 +536,7 @@ FilterPaletteBPP (rfbClient* client, int numRows, CARDBPP *dst)
 static rfbBool
 DecompressJpegRectBPP(rfbClient* client, int x, int y, int w, int h)
 {
+  struct rfbClientPrivate *priv;
   struct jpeg_decompress_struct cinfo;
   struct jpeg_error_mgr jerr;
   int compressedLen;
@@ -529,6 +544,7 @@ DecompressJpegRectBPP(rfbClient* client, int x, int y, int w, int h)
   CARDBPP *pixelPtr;
   JSAMPROW rowPointer[1];
   int dx, dy;
+  priv = RFB_CLIENT_PRIV(client);
 
   compressedLen = (int)ReadCompactLen(client);
   if (compressedLen <= 0) {
@@ -569,7 +585,7 @@ DecompressJpegRectBPP(rfbClient* client, int x, int y, int w, int h)
   dy = 0;
   while (cinfo.output_scanline < cinfo.output_height) {
     jpeg_read_scanlines(&cinfo, rowPointer, 1);
-    if (client->jpegError) {
+    if (priv->jpegError) {
       break;
     }
     pixelPtr = (CARDBPP *)&client->buffer[RFB_BUFFER_SIZE / 2];
@@ -581,13 +597,13 @@ DecompressJpegRectBPP(rfbClient* client, int x, int y, int w, int h)
     dy++;
   }
 
-  if (!client->jpegError)
+  if (!priv->jpegError)
     jpeg_finish_decompress(&cinfo);
 
   jpeg_destroy_decompress(&cinfo);
   free(compressedData);
 
-  return !client->jpegError;
+  return !priv->jpegError;
 }
 
 #else
@@ -622,16 +638,20 @@ static void
 JpegInitSource(j_decompress_ptr cinfo)
 {
   rfbClient* client=(rfbClient*)cinfo->client_data;
-  client->jpegError = FALSE;
+  struct rfbClientPrivate *priv = RFB_CLIENT_PRIV(client);
+  priv = RFB_CLIENT_PRIV(client);
+  priv->jpegError = FALSE;
 }
 
 static boolean
 JpegFillInputBuffer(j_decompress_ptr cinfo)
 {
   rfbClient* client=(rfbClient*)cinfo->client_data;
-  client->jpegError = TRUE;
-  client->jpegSrcManager->bytes_in_buffer = client->jpegBufferLen;
-  client->jpegSrcManager->next_input_byte = (JOCTET *)client->jpegBufferPtr;
+  struct rfbClientPrivate *priv = RFB_CLIENT_PRIV(client);
+  priv = RFB_CLIENT_PRIV(client);
+  priv->jpegError = TRUE;
+  priv->jpegSrcManager->bytes_in_buffer = priv->jpegBufferLen;
+  priv->jpegSrcManager->next_input_byte = (JOCTET *)priv->jpegBufferPtr;
 
   return TRUE;
 }
@@ -640,13 +660,14 @@ static void
 JpegSkipInputData(j_decompress_ptr cinfo, long num_bytes)
 {
   rfbClient* client=(rfbClient*)cinfo->client_data;
-  if (num_bytes < 0 || num_bytes > client->jpegSrcManager->bytes_in_buffer) {
-    client->jpegError = TRUE;
-    client->jpegSrcManager->bytes_in_buffer = client->jpegBufferLen;
-    client->jpegSrcManager->next_input_byte = (JOCTET *)client->jpegBufferPtr;
+  struct rfbClientPrivate *priv = RFB_CLIENT_PRIV(client);
+  if (num_bytes < 0 || num_bytes > priv->jpegSrcManager->bytes_in_buffer) {
+    priv->jpegError = TRUE;
+    priv->jpegSrcManager->bytes_in_buffer = priv->jpegBufferLen;
+    priv->jpegSrcManager->next_input_byte = (JOCTET *)priv->jpegBufferPtr;
   } else {
-    client->jpegSrcManager->next_input_byte += (size_t) num_bytes;
-    client->jpegSrcManager->bytes_in_buffer -= (size_t) num_bytes;
+    priv->jpegSrcManager->next_input_byte += (size_t) num_bytes;
+    priv->jpegSrcManager->bytes_in_buffer -= (size_t) num_bytes;
   }
 }
 
@@ -662,20 +683,21 @@ JpegSetSrcManager(j_decompress_ptr cinfo,
 		  int compressedLen)
 {
   rfbClient* client=(rfbClient*)cinfo->client_data;
-  client->jpegBufferPtr = compressedData;
-  client->jpegBufferLen = (size_t)compressedLen;
+  struct rfbClientPrivate *priv = RFB_CLIENT_PRIV(client);
+  priv->jpegBufferPtr = compressedData;
+  priv->jpegBufferLen = (size_t)compressedLen;
 
-  if(client->jpegSrcManager == NULL)
-    client->jpegSrcManager = malloc(sizeof(struct jpeg_source_mgr));
-  client->jpegSrcManager->init_source = JpegInitSource;
-  client->jpegSrcManager->fill_input_buffer = JpegFillInputBuffer;
-  client->jpegSrcManager->skip_input_data = JpegSkipInputData;
-  client->jpegSrcManager->resync_to_restart = jpeg_resync_to_restart;
-  client->jpegSrcManager->term_source = JpegTermSource;
-  client->jpegSrcManager->next_input_byte = (JOCTET*)client->jpegBufferPtr;
-  client->jpegSrcManager->bytes_in_buffer = client->jpegBufferLen;
+  if(priv->jpegSrcManager == NULL)
+    priv->jpegSrcManager = malloc(sizeof(struct jpeg_source_mgr));
+  priv->jpegSrcManager->init_source = JpegInitSource;
+  priv->jpegSrcManager->fill_input_buffer = JpegFillInputBuffer;
+  priv->jpegSrcManager->skip_input_data = JpegSkipInputData;
+  priv->jpegSrcManager->resync_to_restart = jpeg_resync_to_restart;
+  priv->jpegSrcManager->term_source = JpegTermSource;
+  priv->jpegSrcManager->next_input_byte = (JOCTET*)priv->jpegBufferPtr;
+  priv->jpegSrcManager->bytes_in_buffer = priv->jpegBufferLen;
 
-  cinfo->src = client->jpegSrcManager;
+  cinfo->src = priv->jpegSrcManager;
 }
 
 #endif

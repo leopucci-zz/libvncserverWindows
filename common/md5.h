@@ -77,6 +77,9 @@ typedef uintptr_t md5_uintptr;
    to pointers which should always be correct.  */
 typedef unsigned long int md5_uintptr;
 #endif
+#ifdef _MSC_VER
+#define __THROW
+#endif
 
 /* Structure to save state of computation between the single steps.  */
 struct md5_ctx
@@ -88,7 +91,11 @@ struct md5_ctx
 
   md5_uint32 total[2];
   md5_uint32 buflen;
+#ifdef _MSC_VER
+  char buffer[128];
+#else
   char buffer[128] __attribute__ ((__aligned__ (__alignof__ (md5_uint32))));
+#endif
 };
 
 /*

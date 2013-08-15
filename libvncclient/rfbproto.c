@@ -53,7 +53,9 @@
 #endif
 #include <jpeglib.h>
 #endif
+#ifdef LIBVNCSERVER_HAVE_STRINGS_H
 #include <strings.h>
+#endif
 #include <stdarg.h>
 #include <time.h>
 
@@ -70,7 +72,7 @@
 
 rfbBool rfbEnableClientLogging=TRUE;
 
-static void
+void
 rfbDefaultClientLog(const char *format, ...)
 {
     va_list args;
@@ -91,9 +93,6 @@ rfbDefaultClientLog(const char *format, ...)
 
     va_end(args);
 }
-
-rfbClientLogProc rfbClientLog=rfbDefaultClientLog;
-rfbClientLogProc rfbClientErr=rfbDefaultClientLog;
 
 /* extensions */
 

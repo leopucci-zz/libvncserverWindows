@@ -34,6 +34,7 @@
 #include "zrleoutstream.h"
 #include "zrlepalettehelper.h"
 #include <assert.h>
+#include "private.h"
 
 /* __RFB_CONCAT2 concatenates its two arguments.  __RFB_CONCAT2E does the same
    but also expands its arguments if they are macros */
@@ -99,7 +100,9 @@ static void ZRLE_ENCODE (int x, int y, int w, int h,
                   EXTRA_ARGS
                   )
 {
+  struct rfbClientRecPrivate *priv;
   int ty;
+  priv = RFB_CLIENT_REC_PRIV(cl);
   for (ty = y; ty < y+h; ty += rfbZRLETileHeight) {
     int tx, th = rfbZRLETileHeight;
     if (th > y+h-ty) th = y+h-ty;
@@ -114,7 +117,7 @@ static void ZRLE_ENCODE (int x, int y, int w, int h,
       }
 
       ZRLE_ENCODE_TILE((PIXEL_T*)buf, tw, th, os,
-		      cl->zywrleLevel, cl->zywrleBuf, cl->paletteHelper);
+		      priv->zywrleLevel, priv->zywrleBuf, cl->paletteHelper);
     }
   }
   zrleOutStreamFlush(os);

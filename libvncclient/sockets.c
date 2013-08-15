@@ -30,7 +30,9 @@
 # define _POSIX_SOURCE
 #endif
 #endif
+#ifdef LIBVNCSERVER_HAVE_UNISTD_H
 #include <unistd.h>
+#endif
 #include <errno.h>
 #include <fcntl.h>
 #include <assert.h>
@@ -106,10 +108,12 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 	  diff.tv_usec+=1000000;
         }
 #ifndef __MINGW32__
+#ifndef _MSC_VER
         sleep (diff.tv_sec);
         usleep (diff.tv_usec);
 #else
 	Sleep (diff.tv_sec * 1000 + diff.tv_usec/1000);
+#endif
 #endif
       }
 

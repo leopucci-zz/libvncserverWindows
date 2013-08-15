@@ -108,6 +108,8 @@ rfbBool rfbSendRectEncodingZRLE(rfbClientPtr cl, int x, int y, int w, int h)
   rfbZRLEHeader hdr;
   int i;
   char *zrleBeforeBuf;
+  struct rfbClientRecPrivate *priv;
+  priv = RFB_CLIENT_REC_PRIV(cl);
 
   if (cl->zrleBeforeBuf == NULL) {
 	cl->zrleBeforeBuf = (char *) malloc(rfbZRLETileWidth * rfbZRLETileHeight * 4 + 4);
@@ -115,21 +117,21 @@ rfbBool rfbSendRectEncodingZRLE(rfbClientPtr cl, int x, int y, int w, int h)
   zrleBeforeBuf = cl->zrleBeforeBuf;
 
   if (cl->preferredEncoding == rfbEncodingZYWRLE) {
-	  if (cl->tightQualityLevel < 0) {
-		  cl->zywrleLevel = 1;
-	  } else if (cl->tightQualityLevel < 3) {
-		  cl->zywrleLevel = 3;
-	  } else if (cl->tightQualityLevel < 6) {
-		  cl->zywrleLevel = 2;
+	  if (priv->tightQualityLevel < 0) {
+		  priv->zywrleLevel = 1;
+	  } else if (priv->tightQualityLevel < 3) {
+		  priv->zywrleLevel = 3;
+	  } else if (priv->tightQualityLevel < 6) {
+		  priv->zywrleLevel = 2;
 	  } else {
-		  cl->zywrleLevel = 1;
+		  priv->zywrleLevel = 1;
 	  }
   } else
-	  cl->zywrleLevel = 0;
+	  priv->zywrleLevel = 0;
 
-  if (!cl->zrleData)
-    cl->zrleData = zrleOutStreamNew();
-  zos = cl->zrleData;
+  if (!priv->zrleData)
+    priv->zrleData = zrleOutStreamNew();
+  zos = priv->zrleData;
   zos->in.ptr = zos->in.start;
   zos->out.ptr = zos->out.start;
 
@@ -239,10 +241,12 @@ rfbBool rfbSendRectEncodingZRLE(rfbClientPtr cl, int x, int y, int w, int h)
 
 void rfbFreeZrleData(rfbClientPtr cl)
 {
-	if (cl->zrleData) {
-		zrleOutStreamFree(cl->zrleData);
+	struct rfbClientRecPrivate *priv;
+	priv = RFB_CLIENT_REC_PRIV(cl);
+	if (priv->zrleData) {
+		zrleOutStreamFree(priv->zrleData);
 	}
-	cl->zrleData = NULL;
+	priv->zrleData = NULL;
 
 	if (cl->zrleBeforeBuf) {
 		free(cl->zrleBeforeBuf);

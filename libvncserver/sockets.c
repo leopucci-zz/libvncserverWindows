@@ -103,7 +103,14 @@ int deny_severity=LOG_WARNING;
 #endif
 #define read(sock,buf,len) recv(sock,buf,len,0)
 #define EWOULDBLOCK WSAEWOULDBLOCK
+#ifndef _MSC_VER
 #define ETIMEDOUT WSAETIMEDOUT
+#else
+#ifdef LIBVNCSERVER_HAVE_WS2TCPIP_H
+#undef socklen_t
+#include <ws2tcpip.h>
+#endif
+#endif
 #define write(sock,buf,len) send(sock,buf,len,0)
 #else
 #define closesocket close
@@ -176,7 +183,7 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
         }
 
         if (i >= 6000) {
-	    rfbLogPerror("Failure autoprobing");
+	    rfbLogPerror("IPv6 Failure autoprobing");
 	    return;
         }
 
@@ -397,6 +404,7 @@ rfbProcessNewConnection(rfbScreenInfoPtr rfbScreen)
     int sock = -1;
 #ifdef LIBVNCSERVER_IPv6
     struct sockaddr_storage addr;
+    char host[1024];
 #else
     struct sockaddr_in addr;
 #endif
@@ -450,7 +458,6 @@ rfbProcessNewConnection(rfbScreenInfoPtr rfbScreen)
 #endif
 
 #ifdef LIBVNCSERVER_IPv6
-    char host[1024];
     if(getnameinfo((struct sockaddr*)&addr, addrlen, host, sizeof(host), NULL, 0, NI_NUMERICHOST) != 0) {
       rfbLogPerror("rfbProcessNewConnection: error in getnameinfo");
     }
@@ -498,7 +505,9 @@ rfbCloseClient(rfbClientPtr cl)
 	free(cl->wspath);
 #endif
 #ifndef __MINGW32__
+#ifndef _MSC_VER
 	shutdown(cl->sock,SHUT_RDWR);
+#endif
 #endif
 	closesocket(cl->sock);
 	cl->sock = -1;
@@ -871,6 +880,17 @@ rfbListenOnTCPPort(int port,
 }
 
 
+static int rfbIsIPv6Support()
+{
+	int s;
+	s = socket(AF_INET6, SOCK_STREAM, 0);
+	if (s > 0) {
+		closesocket(s);
+		return 1;
+	}
+	return 0;
+}
+
 int
 rfbListenOnTCP6Port(int port,
                     const char* iface)
@@ -885,6 +905,9 @@ rfbListenOnTCP6Port(int port,
     struct addrinfo hints, *servinfo, *p;
     char port_str[8];
 
+	if (!rfbIsIPv6Support()) {
+		return -1;
+	}
     snprintf(port_str, 8, "%d", port);
 
     memset(&hints, 0, sizeof(hints));
@@ -904,12 +927,18 @@ rfbListenOnTCP6Port(int port,
         }
 
 #ifdef IPV6_V6ONLY
-	/* we have seperate IPv4 and IPv6 sockets since some OS's do not support dual binding */
-	if (setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, (char *)&one, sizeof(one)) < 0) {
-	  rfbLogPerror("rfbListenOnTCP6Port error in setsockopt IPV6_V6ONLY");
-	  closesocket(sock);
-	  freeaddrinfo(servinfo);
-	  return -1;
+#if defined(_MSC_VER)
+	/* According to MSDN, Only Vista and Later OS support IPV6_V6ONLY. */
+	if (IsWinVistaOrLater()) 
+#endif
+	{
+		/* we have seperate IPv4 and IPv6 sockets since some OS's do not support dual binding */
+		if (setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, (char *)&one, sizeof(one)) < 0) {
+		  rfbLogPerror("rfbListenOnTCP6Port error in setsockopt IPV6_V6ONLY");
+		  closesocket(sock);
+		  freeaddrinfo(servinfo);
+		  return -1;
+		}
 	}
 #endif
 

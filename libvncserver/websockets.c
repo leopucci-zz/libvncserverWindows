@@ -31,7 +31,12 @@
 #endif
 
 #include <rfb/rfb.h>
+#ifndef _MSC_VER
 #include <resolv.h> /* __b64_ntop */
+#else
+#define __func__ __FUNCTION__
+#include "base64.h"
+#endif
 /* errno */
 #include <errno.h>
 
@@ -46,16 +51,27 @@
 #endif
 
 #include <string.h>
+#ifdef LIBVNCSERVER_HAVE_UNISTD_H
 #include <unistd.h>
+#endif
 #include "rfb/rfbconfig.h"
 #include "rfbssl.h"
 #include "rfbcrypto.h"
 
+#ifndef _MSC_VER
 #define WS_NTOH64(n) htobe64(n)
 #define WS_NTOH32(n) htobe32(n)
 #define WS_NTOH16(n) htobe16(n)
 #define WS_HTON64(n) htobe64(n)
 #define WS_HTON16(n) htobe16(n)
+#else
+#define WS_NTOH64(n) bswap_64(n)
+#define WS_NTOH32(n) bswap_32(n)
+#define WS_NTOH16(n) bswap_16(n)
+#define WS_HTON64(n) bswap_64(n)
+#define WS_HTON16(n) bswap_16(n)
+#endif
+
 
 #define B64LEN(__x) (((__x + 2) / 3) * 12 / 3)
 #define WSHLENMAX 14  /* 2 + sizeof(uint64_t) + sizeof(uint32_t) */
@@ -94,6 +110,25 @@ typedef union ws_mask_s {
   uint32_t u;
 } ws_mask_t;
 
+#ifdef _MSC_VER
+#pragma pack(push,1)
+typedef struct ws_header_s {
+  unsigned char b0;
+  unsigned char b1;
+  union {
+    struct {
+      uint16_t l16;
+      ws_mask_t m16;
+    } s16;
+    struct {
+      uint64_t l64;
+      ws_mask_t m64;
+    } s64;
+    ws_mask_t m;
+  } u;
+} ws_header_t;
+#pragma pack(pop)
+#else
 /* XXX: The union and the structs do not need to be named.
  *      We are working around a bug present in GCC < 4.6 which prevented
  *      it from recognizing anonymous structs and unions.
@@ -114,6 +149,7 @@ typedef struct __attribute__ ((__packed__)) ws_header_s {
     ws_mask_t m;
   } u;
 } ws_header_t;
+#endif
 
 enum
 {
@@ -170,10 +206,12 @@ static int webSocketsEncodeHixie(rfbClientPtr cl, const char *src, int len, char
 static int webSocketsDecodeHybi(rfbClientPtr cl, char *dst, int len);
 static int webSocketsDecodeHixie(rfbClientPtr cl, char *dst, int len);
 
+#ifndef _MSC_VER
 static int
 min (int a, int b) {
     return a < b ? a : b;
 }
+#endif
 
 static void webSocketsGenSha1Key(char *target, int size, char *key)
 {

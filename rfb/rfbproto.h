@@ -62,10 +62,13 @@
 
 
 #if defined(WIN32) && !defined(__MINGW32__)
+// Todo: Check endian during CMake
+#ifndef _MSC_VER
 #define LIBVNCSERVER_WORDS_BIGENDIAN
-#define rfbBool int
+#endif
+#define rfbBool char
 #include <sys/timeb.h>
-#include <winsock.h>
+#include <winsock2.h>
 #undef SOCKET
 #define SOCKET int
 #else
@@ -87,9 +90,13 @@
 #define LIBVNCSERVER_WORDS_BIGENDIAN
 #endif
 
-/* MS compilers don't have strncasecmp */
 #ifdef _MSC_VER
+#include <rfb/rfbconfig.h>
+/* MS compilers don't have strncasecmp */
 #define strncasecmp _strnicmp
+#define snprintf _snprintf
+#include <stdint.h>
+typedef intptr_t ssize_t;
 #endif
 
 #if !defined(WIN32) || defined(__MINGW32__)
@@ -1467,7 +1474,6 @@ typedef union {
 #define MAXPWLEN 8
 #define CHALLENGESIZE 16
 
-extern int rfbEncryptAndStorePasswd(char *passwd, char *fname);
 extern char *rfbDecryptPasswdFromFile(char *fname);
 extern void rfbRandomBytes(unsigned char *bytes);
 extern void rfbEncryptBytes(unsigned char *bytes, char *passwd);
